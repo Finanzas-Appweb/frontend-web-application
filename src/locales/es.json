@@ -1,0 +1,14 @@
+{
+  "nav-bar": {
+    "home": "Inicio",
+    "clients": "Clientes",
+    "simulator": "Simulador",
+    "properties": "Propiedades",
+    "reports": "Reportes",
+    "settings": "Configuración",
+    "logout": "Cerrar sesión"
+  },
+  "footer": {
+    "copyright": "\uD83C\uDDEA\uD83C\uDDF8 © 2025 Urbania360. Todos los derechos reservados."
+  }
+}

@@ -1,0 +1,363 @@
+{
+  "users": [
+    {
+      "id": "1",
+      "username": "rhirot",
+      "password": "password123",
+      "firstName": "Raúl",
+      "lastName": "Tasayco",
+      "dni": "74219359",
+      "phone": "987654321",
+      "email": "raul.tasayco@urbania360.com"
+    },
+    {
+      "id": "2",
+      "username": "mgomez",
+      "password": "password123",
+      "firstName": "Matteus",
+      "lastName": "Gómez",
+      "dni": "72184590",
+      "phone": "999876543",
+      "email": "matteus.gomez@urbania360.com"
+    },
+    {
+      "id": "1ebc",
+      "username": "dexter",
+      "firstName": "admin",
+      "lastName": "admin",
+      "dni": "77777777",
+      "phone": "999999999",
+      "email": "admin@gmail.com",
+      "password": "admin123"
+    }
+  ],
+  "clients": [
+    {
+      "id": "1",
+      "name": "Lucía Fernández Rojas",
+      "email": "lucia.fernandez@example.com",
+      "phone": "956783412",
+      "annualIncome": 120000
+    },
+    {
+      "id": "2",
+      "name": "Carlos Méndez Paredes",
+      "email": "carlos.mendez@example.com",
+      "phone": "987123654",
+      "annualIncome": 95000
+    },
+    {
+      "id": "3",
+      "name": "María Salazar Torres",
+      "email": "maria.salazar@example.com",
+      "phone": "912456789",
+      "annualIncome": 145000
+    },
+    {
+      "id": "4",
+      "name": "Jorge Ramírez Soto",
+      "email": "jorge.ramirez@example.com",
+      "phone": "999321654",
+      "annualIncome": 110000
+    }
+  ],
+  "properties": [
+    {
+      "id": "1",
+      "code": "P0001",
+      "price": 1250000,
+      "address": "Av. Primavera 540",
+      "city": "Santiago de Surco, Lima",
+      "type": "Departamento",
+      "area": 120,
+      "imageUrl": "https://www.google.com/search?q=https://placehold.co/400x300%3Ftext%3DDepartamento+Surco"
+    },
+    {
+      "id": "2",
+      "code": "P0002",
+      "price": 980000,
+      "address": "Calle Las Orquídeas 210",
+      "city": "Miraflores, Lima",
+      "type": "Departamento",
+      "area": 95,
+      "imageUrl": "https://www.google.com/search?q=https://placehold.co/400x300%3Ftext%3DDepartamento+Miraflores"
+    },
+    {
+      "id": "3",
+      "code": "P0003",
+      "price": 1600000,
+      "address": "Jr. Los Álamos 890",
+      "city": "La Molina, Lima",
+      "type": "Casa",
+      "area": 250,
+      "imageUrl": "https://www.google.com/search?q=https://placehold.co/400x300%3Ftext%3DCasa+La+Molina"
+    },
+    {
+      "id": "4",
+      "code": "P0004",
+      "price": 780000,
+      "address": "Av. Colonial 3050",
+      "city": "Lima Cercado, Lima",
+      "type": "Departamento",
+      "area": 85,
+      "imageUrl": "https://www.google.com/search?q=https://placehold.co/400x300%3Ftext%3DDepartamento+Colonial"
+    }
+  ],
+  "simulations": [
+    {
+      "id": "1",
+      "clientId": 1,
+      "propertyId": 2,
+      "simulationInput": {
+        "monto": 500000,
+        "plazo": 20,
+        "moneda": "soles",
+        "tipoTasa": "efectiva",
+        "tasa": 8.5,
+        "periodoGracia": "3 meses"
+      },
+      "simulationOutput": {
+        "cuotaMensual": 4350.75,
+        "van": 15230.5,
+        "tir": 9.2,
+        "tcea": 9.8,
+        "costoTotal": 1044180
+      },
+      "createdAt": "2025-10-15T14:32:00Z"
+    },
+    {
+      "id": "2",
+      "clientId": 3,
+      "propertyId": 1,
+      "simulationInput": {
+        "monto": 800000,
+        "plazo": 25,
+        "moneda": "soles",
+        "tipoTasa": "efectiva",
+        "tasa": 7.9,
+        "periodoGracia": "2 meses"
+      },
+      "simulationOutput": {
+        "cuotaMensual": 4905.25,
+        "van": 20210.1,
+        "tir": 8.6,
+        "tcea": 9.1,
+        "costoTotal": 1471575
+      },
+      "createdAt": "2025-09-22T10:05:00Z"
+    },
+    {
+      "id": "3",
+      "clientId": 4,
+      "propertyId": 3,
+      "simulationInput": {
+        "monto": 1000000,
+        "plazo": 30,
+        "moneda": "soles",
+        "tipoTasa": "efectiva",
+        "tasa": 8.3,
+        "periodoGracia": "sin gracia"
+      },
+      "simulationOutput": {
+        "cuotaMensual": 6250,
+        "van": 18120,
+        "tir": 8.9,
+        "tcea": 9.5,
+        "costoTotal": 1687500
+      },
+      "createdAt": "2025-11-05T09:45:00Z"
+    },
+    {
+      "id": "f449",
+      "clientId": 1,
+      "propertyId": 1,
+      "simulationInput": {
+        "monto": 10000,
+        "plazo": 2,
+        "moneda": "dólares",
+        "tipoTasa": "nominal",
+        "tasa": 23,
+        "periodoGracia": "3 meses"
+      },
+      "simulationOutput": {
+        "cuotaMensual": "523.73",
+        "van": "2569.59",
+        "tir": 23,
+        "tcea": "24.15",
+        "costoTotal": "12569.59"
+      },
+      "createdAt": "2025-11-11T04:54:38.145Z"
+    },
+    {
+      "id": "b5fb",
+      "clientId": 1,
+      "propertyId": 1,
+      "simulationInput": {
+        "monto": 650000,
+        "plazo": 12,
+        "moneda": "soles",
+        "tipoTasa": "nominal",
+        "tasa": 4,
+        "periodoGracia": "3 meses"
+      },
+      "simulationOutput": {
+        "cuotaMensual": "5690.93",
+        "van": "169494.55",
+        "tir": 4,
+        "tcea": "4.20",
+        "costoTotal": "819494.55"
+      },
+      "createdAt": "2025-11-11T04:58:32.901Z"
+    }
+  ],
+  "profile": {
+    "id": "user123",
+    "username": "rhirot",
+    "firstName": "Raúl",
+    "lastName": "Tasayco",
+    "dni": "7*****9",
+    "phone": "9*****034",
+    "email": "raul.tasayco@urbania360.com"
+  },
+  "settings": {
+    "defaultCurrency": "soles",
+    "defaultRateType": "efectiva"
+  },
+  "financialEntities": [
+    {
+      "id": "1",
+      "name": "BCP",
+      "rate": 8.5
+    },
+    {
+      "id": "2",
+      "name": "Interbank",
+      "rate": 8.1
+    },
+    {
+      "id": "3",
+      "name": "Scotiabank",
+      "rate": 8.9
+    },
+    {
+      "id": "4",
+      "name": "BBVA",
+      "rate": 8.3
+    }
+  ],
+  "dashboardStats": {
+    "clientsCount": 125,
+    "simulationsThisMonth": 31,
+    "propertiesCount": 42
+  },
+  "topPropertiesReport": [
+    {
+      "code": "P0001",
+      "address": "Av. Primavera 540, Santiago de Surco",
+      "consultas": 58,
+      "id": "101f"
+    },
+    {
+      "code": "P0002",
+      "address": "Calle Las Orquídeas 210, Miraflores",
+      "consultas": 45,
+      "id": "deae"
+    },
+    {
+      "code": "P0003",
+      "address": "Jr. Los Álamos 890, La Molina",
+      "consultas": 39,
+      "id": "dab4"
+    },
+    {
+      "code": "P0004",
+      "address": "Av. Colonial 3050, Lima Cercado",
+      "consultas": 22,
+      "id": "14e7"
+    }
+  ],
+  "entitySelectionReport": [
+    {
+      "name": "BCP",
+      "percentage": 40,
+      "id": "246d"
+    },
+    {
+      "name": "Interbank",
+      "percentage": 25,
+      "id": "a134"
+    },
+    {
+      "name": "BBVA",
+      "percentage": 20,
+      "id": "9f5d"
+    },
+    {
+      "name": "Scotiabank",
+      "percentage": 15,
+      "id": "33e8"
+    }
+  ],
+  "simulationsByMonthReport": [
+    {
+      "month": "Ene",
+      "count": 14,
+      "id": "d779"
+    },
+    {
+      "month": "Feb",
+      "count": 18,
+      "id": "0541"
+    },
+    {
+      "month": "Mar",
+      "count": 22,
+      "id": "370c"
+    },
+    {
+      "month": "Abr",
+      "count": 19,
+      "id": "ba32"
+    },
+    {
+      "month": "May",
+      "count": 25,
+      "id": "32a0"
+    },
+    {
+      "month": "Jun",
+      "count": 30,
+      "id": "4068"
+    },
+    {
+      "month": "Jul",
+      "count": 27,
+      "id": "f6ad"
+    },
+    {
+      "month": "Ago",
+      "count": 35,
+      "id": "75f5"
+    },
+    {
+      "month": "Sep",
+      "count": 33,
+      "id": "2cb2"
+    },
+    {
+      "month": "Oct",
+      "count": 28,
+      "id": "87a2"
+    },
+    {
+      "month": "Nov",
+      "count": 31,
+      "id": "fb2e"
+    },
+    {
+      "month": "Dic",
+      "count": 24,
+      "id": "bb03"
+    }
+  ]
+}
