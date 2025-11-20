@@ -29,6 +29,16 @@
       "phone": "999999999",
       "email": "admin@gmail.com",
       "password": "admin123"
+    },
+    {
+      "id": "9c2f",
+      "username": "ronii",
+      "firstName": "Ronald Joel",
+      "lastName": "Peralta",
+      "dni": "77673481",
+      "phone": "953091144",
+      "email": "ronald@gmail.com",
+      "password": "12345678"
     }
   ],
   "clients": [
@@ -105,69 +115,6 @@
   ],
   "simulations": [
     {
-      "id": "1",
-      "clientId": 1,
-      "propertyId": 2,
-      "simulationInput": {
-        "monto": 500000,
-        "plazo": 20,
-        "moneda": "soles",
-        "tipoTasa": "efectiva",
-        "tasa": 8.5,
-        "periodoGracia": "3 meses"
-      },
-      "simulationOutput": {
-        "cuotaMensual": 4350.75,
-        "van": 15230.5,
-        "tir": 9.2,
-        "tcea": 9.8,
-        "costoTotal": 1044180
-      },
-      "createdAt": "2025-10-15T14:32:00Z"
-    },
-    {
-      "id": "2",
-      "clientId": 3,
-      "propertyId": 1,
-      "simulationInput": {
-        "monto": 800000,
-        "plazo": 25,
-        "moneda": "soles",
-        "tipoTasa": "efectiva",
-        "tasa": 7.9,
-        "periodoGracia": "2 meses"
-      },
-      "simulationOutput": {
-        "cuotaMensual": 4905.25,
-        "van": 20210.1,
-        "tir": 8.6,
-        "tcea": 9.1,
-        "costoTotal": 1471575
-      },
-      "createdAt": "2025-09-22T10:05:00Z"
-    },
-    {
-      "id": "3",
-      "clientId": 4,
-      "propertyId": 3,
-      "simulationInput": {
-        "monto": 1000000,
-        "plazo": 30,
-        "moneda": "soles",
-        "tipoTasa": "efectiva",
-        "tasa": 8.3,
-        "periodoGracia": "sin gracia"
-      },
-      "simulationOutput": {
-        "cuotaMensual": 6250,
-        "van": 18120,
-        "tir": 8.9,
-        "tcea": 9.5,
-        "costoTotal": 1687500
-      },
-      "createdAt": "2025-11-05T09:45:00Z"
-    },
-    {
       "id": "f449",
       "clientId": 1,
       "propertyId": 1,
@@ -177,37 +124,26 @@
         "moneda": "dólares",
         "tipoTasa": "nominal",
         "tasa": 23,
-        "periodoGracia": "3 meses"
+        "periodoGracia": "3 meses",
+        "cuotaInicial": 1000,
+        "seguroDesgravamen": 0.00045,
+        "seguroInmueble": 0.00015,
+        "tipoPeriodoGracia": "total",
+        "bonoMiVivienda": 0
       },
       "simulationOutput": {
         "cuotaMensual": "523.73",
         "van": "2569.59",
         "tir": 23,
         "tcea": "24.15",
-        "costoTotal": "12569.59"
+        "costoTotal": "12569.59",
+        "montoPrestamo": 9000,
+        "interesesTotales": 3569.59,
+        "porcentajeFinanciado": 90,
+        "fechaFinCredito": "2027-11",
+        "ratioDeudaIngreso": 0.05
       },
       "createdAt": "2025-11-11T04:54:38.145Z"
-    },
-    {
-      "id": "b5fb",
-      "clientId": 1,
-      "propertyId": 1,
-      "simulationInput": {
-        "monto": 650000,
-        "plazo": 12,
-        "moneda": "soles",
-        "tipoTasa": "nominal",
-        "tasa": 4,
-        "periodoGracia": "3 meses"
-      },
-      "simulationOutput": {
-        "cuotaMensual": "5690.93",
-        "van": "169494.55",
-        "tir": 4,
-        "tcea": "4.20",
-        "costoTotal": "819494.55"
-      },
-      "createdAt": "2025-11-11T04:58:32.901Z"
     }
   ],
   "profile": {

@@ -1,8 +1,10 @@
 import { Profile } from "../model/profile.entity.js"
 import { FinancialEntity } from "../model/financialEntity.entity.js"
+import apiClient from "../../../shared/infraestructure/services/api.client.js";
 
 export class SettingsAssembler {
     static toProfile(response) {
+        // response.data contiene el objeto del usuario directamente
         return new Profile(response.data)
     }
 
@@ -11,37 +13,34 @@ export class SettingsAssembler {
     }
 
     static async getSettings() {
-        // Simulación de datos (puedes reemplazar luego con fetch o axios)
-        const profileResponse = {
-            data: {
-                username: "rtasayco",
-                firstName: "Raúl Hiroshi",
-                lastName: "Tasayco Osorio",
-                dni: "74851236",
-                phone: "987654321",
-                email: "raul@upc.edu.pe",
-            },
-        }
+        try {
+            // Solicitamos /users/1 para simular que obtenemos el perfil del usuario logueado (ID 1)
+            const [userResponse, entitiesResponse, settingsResponse] = await Promise.all([
+                apiClient.get("/users/1"),
+                apiClient.get("/financialEntities"),
+                apiClient.get("/settings")
+            ]);
 
-        const financialEntitiesResponse = {
-            data: [
-                { id: 1, name: "BCP", rate: "3.74" },
-                { id: 2, name: "Interbank", rate: "3.76" },
-                { id: 3, name: "Scotiabank", rate: "3.78" },
-            ],
-        }
-
-        return {
-            profile: this.toProfile(profileResponse),
-            financialEntities: this.toFinancialEntities(financialEntitiesResponse),
-            defaultCurrency: "PEN",
-            defaultRateType: "promedio",
+            return {
+                profile: this.toProfile(userResponse),
+                financialEntities: this.toFinancialEntities(entitiesResponse),
+                defaultCurrency: settingsResponse.data.defaultCurrency || "PEN",
+                defaultRateType: settingsResponse.data.defaultRateType || "promedio",
+            }
+        } catch (error) {
+            console.error("Error al cargar la configuración desde el API:", error);
+            throw error;
         }
     }
 
     static async saveSettings(data) {
-        console.log("Guardando configuración:", data)
-        // Aquí podrías hacer un POST o PUT a tu API
-        return true
+        try {
+            console.log("Guardando configuración en API (simulado):", data)
+            // Aquí podrías implementar apiClient.put(`/users/${data.profile.id}`, data.profile)
+            return true
+        } catch (error) {
+            console.error("Error al guardar configuración:", error);
+            return false;
+        }
     }
 }
