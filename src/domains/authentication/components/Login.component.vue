@@ -1,42 +1,45 @@
 <script>
-import axios from "axios"
 import FooterContent from "../../../shared/presentation/components/footer-content.vue"
+import { login } from "../services/auth.service.js"
 
 export default {
   name: "login.component",
   components: { FooterContent },
   data() {
     return {
-      username: '',
+      email: '',
       password: ''
     }
   },
   methods: {
     async handleLogin() {
-      if (!this.username || !this.password) {
+      if (!this.email || !this.password) {
         alert('Por favor completa todos los campos')
         return
       }
 
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(this.email)) {
+        alert('Por favor ingresa un correo válido')
+        return
+      }
+
       try {
-        // URL de tu fake API
-        const response = await axios.get(`http://localhost:3536/users?username=${this.username}&password=${this.password}`)
+        const user = await login(this.email, this.password)
+        console.log('✅ Usuario autenticado:', user)
 
-        if (response.data.length > 0) {
-          const user = response.data[0]
-          console.log('✅ Usuario autenticado:', user)
-
-          // Guardamos el usuario en localStorage
-          localStorage.setItem('urbania360:user', JSON.stringify(user))
-
-          // Redirigimos al dashboard de clientes
-          this.$router.push('/clients')
-        } else {
-          alert('Usuario o contraseña incorrectos')
-        }
+        // Redirigimos al dashboard de clientes
+        this.$router.push('/clients')
       } catch (error) {
-        console.error('❌ Error al conectar con la API:', error)
-        alert('Error al iniciar sesión. Verifica la conexión con el servidor.')
+        console.error('❌ Error al iniciar sesión:', error)
+        
+        if (error.response?.status === 401) {
+          alert('Correo o contraseña incorrectos')
+        } else if (error.response?.data?.title) {
+          alert(`Error: ${error.response.data.title}`)
+        } else {
+          alert('Error al iniciar sesión. Verifica la conexión con el servidor.')
+        }
       }
     },
 
@@ -62,9 +65,9 @@ export default {
       <!-- Inputs -->
       <div class="input-group">
         <input
-            v-model="username"
-            type="text"
-            placeholder="Nombre de usuario"
+            v-model="email"
+            type="email"
+            placeholder="Correo electrónico"
             class="input-field"
         />
       </div>
