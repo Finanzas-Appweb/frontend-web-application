@@ -1,6 +1,8 @@
 <script>
-import apiClient from "../../../shared/infraestructure/services/api.client.js";
 import { SimulationsAssembler } from "../services/simulations.assembler.js";
+import { ClientsAssembler } from "../../clients/services/clients.assembler.js";
+import { PropertiesAssembler } from "../../properties/services/properties.assembler.js";
+import { BanksAssembler } from "../../banks/services/banks.assembler.js";
 import NavBar from "../../../shared/presentation/components/nav-bar.vue";
 import FooterContent from "../../../shared/presentation/components/footer-content.vue";
 
@@ -9,36 +11,70 @@ export default {
   components: { FooterContent, NavBar },
   data() {
     return {
-      // Datos de entrada del usuario
-      simulationInput: {
-        monto: 500000,        // Valor del Inmueble
-        cuotaInicial: 50000,  // Nuevo
-        bonoMiVivienda: 0,    // Nuevo
-        plazo: 20,
-        moneda: "soles",
-        tipoTasa: "efectiva",
-        tasa: 8.5,            // Tasa Anual
-        periodoGracia: 0,     // Meses numéricos
-        tipoPeriodoGracia: "sin gracia", // Nuevo enum
-        seguroDesgravamen: 0.028, // % Mensual aprox
-        seguroInmueble: 0.025,    // % Mensual aprox
+      // Listas para selects
+      clients: [],
+      properties: [],
+      banks: [],
+      
+      // Formulario de simulación
+      simulationForm: {
+        clientId: "",
+        propertyId: "",
+        bankId: 0,
+        principal: 0,
+        currency: 1, // 1 = PEN, 2 = USD
+        rateType: 1, // 1 = TEA, 2 = TNA
+        tea: 0,
+        tna: 0,
+        capitalizationPerYear: 12,
+        termMonths: 240, // 20 años por defecto
+        graceType: 0, // 0 = None, 1 = Total, 2 = Partial
+        graceMonths: 0,
+        startDate: new Date().toISOString().split('T')[0],
+        applyMiViviendaBonus: false,
+        bonusAmount: 0,
+        lifeInsuranceRateMonthly: 0.028, // 0.028% aprox
+        riskInsuranceRateAnnual: 0.025, // 0.025% aprox
+        feesMonthly: 0
       },
-      ingresoMensualCliente: 15000, // Dato extra para calcular el Ratio Deuda/Ingreso
-
+      
       simulationResult: null,
       simulations: [],
       loading: false,
       loadingHistory: true,
+      validationErrors: []
     };
   },
   async mounted() {
-    await this.loadSimulations();
+    await this.loadInitialData();
   },
   methods: {
+    async loadInitialData() {
+      try {
+        // Cargar clientes
+        const clientsResult = await ClientsAssembler.getClients({ pageSize: 100 });
+        this.clients = clientsResult.clients;
+
+        // Cargar propiedades
+        const propsResult = await PropertiesAssembler.getProperties({ pageSize: 100 });
+        this.properties = propsResult.properties;
+
+        // Cargar bancos
+        const banksResult = await BanksAssembler.getBanks();
+        this.banks = banksResult.data;
+
+        // Cargar historial de simulaciones
+        await this.loadSimulations();
+      } catch (error) {
+        console.error("Error cargando datos iniciales:", error);
+      }
+    },
+
     async loadSimulations() {
       try {
-        const response = await apiClient.get("/simulations");
-        this.simulations = SimulationsAssembler.toEntitiesFromResponse(response);
+        this.loadingHistory = true;
+        const result = await SimulationsAssembler.getSimulations({ pageSize: 10 });
+        this.simulations = result.simulations;
       } catch (error) {
         console.error("Error al cargar simulaciones:", error);
       } finally {
@@ -46,124 +82,123 @@ export default {
       }
     },
 
-    async simulate() {
-      // 1. Validaciones básicas
-      if (
-          !this.simulationInput.monto ||
-          !this.simulationInput.plazo ||
-          !this.simulationInput.tasa
-      ) {
-        alert("Por favor completa los campos principales (Monto, Plazo, Tasa).");
-        return;
+    validateForm() {
+      this.validationErrors = [];
+
+      if (!this.simulationForm.clientId) {
+        this.validationErrors.push("Debe seleccionar un cliente");
+      }
+      if (!this.simulationForm.propertyId) {
+        this.validationErrors.push("Debe seleccionar una propiedad");
+      }
+      if (!this.simulationForm.bankId || this.simulationForm.bankId === 0) {
+        this.validationErrors.push("Debe seleccionar un banco");
+      }
+      if (!this.simulationForm.principal || this.simulationForm.principal <= 0) {
+        this.validationErrors.push("El monto principal debe ser mayor a 0");
+      }
+      
+      // Validar tasa según tipo
+      if (this.simulationForm.rateType === 1 && (!this.simulationForm.tea || this.simulationForm.tea <= 0)) {
+        this.validationErrors.push("La TEA debe ser mayor a 0");
+      }
+      if (this.simulationForm.rateType === 2 && (!this.simulationForm.tna || this.simulationForm.tna <= 0)) {
+        this.validationErrors.push("La TNA debe ser mayor a 0");
       }
 
-      this.loading = true;
-
-      // 2. Obtener valores numéricos limpios
-      const valorInmueble = parseFloat(this.simulationInput.monto);
-      const inicial = parseFloat(this.simulationInput.cuotaInicial) || 0;
-      const bono = parseFloat(this.simulationInput.bonoMiVivienda) || 0;
-
-      // 3. Calcular Monto del Préstamo (Capital)
-      const montoPrestamo = valorInmueble - inicial - bono;
-
-      if (montoPrestamo <= 0) {
-        alert("La cuota inicial y bonos superan el valor del inmueble.");
-        this.loading = false;
-        return;
+      if (!this.simulationForm.termMonths || this.simulationForm.termMonths <= 0) {
+        this.validationErrors.push("El plazo debe ser mayor a 0 meses");
       }
 
-      // 4. Conversión de Tasa Anual a Mensual
-      let tasaMensual = 0;
-      if (this.simulationInput.tipoTasa === 'efectiva') {
-        // Fórmula: (1 + TEA)^(1/12) - 1
-        tasaMensual = Math.pow(1 + (this.simulationInput.tasa / 100), 1 / 12) - 1;
-      } else {
-        // Nominal: TNA / 12
-        tasaMensual = (this.simulationInput.tasa / 100) / 12;
+      // Validación de bono MiVivienda
+      if (this.simulationForm.applyMiViviendaBonus) {
+        if (!this.simulationForm.bonusAmount || this.simulationForm.bonusAmount <= 0) {
+          this.validationErrors.push("Si aplica bono MiVivienda, el monto debe ser mayor a 0");
+        } else if (this.simulationForm.bonusAmount >= this.simulationForm.principal) {
+          this.validationErrors.push("El bono MiVivienda debe ser menor al monto principal");
+        }
       }
 
-      const totalMeses = this.simulationInput.plazo * 12;
-      const mesesGracia = parseInt(this.simulationInput.periodoGracia) || 0;
-      const mesesPagar = totalMeses - mesesGracia;
-
-      // 5. Cálculo de Cuota Base (Amortización Francés)
-      // Nota: Simplificado para el ejemplo. Si hay gracia total, el capital aumenta.
-      // Aquí asumimos gracia simple o periodo muerto para visualización rápida.
-      let cuotaBase = 0;
-      if (mesesPagar > 0) {
-        cuotaBase = (montoPrestamo * tasaMensual) / (1 - Math.pow(1 + tasaMensual, -mesesPagar));
-      }
-
-      // 6. Cálculo de Seguros (Aproximación Mensual)
-      // Desgravamen suele ser sobre saldo deudor, Inmueble sobre valor propiedad.
-      // Para la "Cuota Mensual" referencial usamos el valor inicial.
-      const costoSeguroDesg = montoPrestamo * (this.simulationInput.seguroDesgravamen / 100);
-      const costoSeguroInm = valorInmueble * (this.simulationInput.seguroInmueble / 100);
-
-      const cuotaTotalMensual = cuotaBase + costoSeguroDesg + costoSeguroInm;
-
-      // 7. Métricas Financieras Adicionales
-      const totalPagado = (cuotaTotalMensual * mesesPagar);
-      const interesesTotales = totalPagado - montoPrestamo;
-      const porcentajeFinanciado = (montoPrestamo / valorInmueble) * 100;
-
-      // Ratio Deuda / Ingreso
-      const ratio = this.ingresoMensualCliente > 0
-          ? (cuotaTotalMensual / this.ingresoMensualCliente).toFixed(2)
-          : 0;
-
-      // Calcular fecha final
-      const fechaFin = new Date();
-      fechaFin.setMonth(fechaFin.getMonth() + totalMeses);
-
-      // 8. Construir Objeto Resultado (Mapeado al API Fake)
-      this.simulationResult = {
-        cuotaMensual: cuotaTotalMensual.toFixed(2),
-        tcea: (this.simulationInput.tasa * 1.02).toFixed(2), // Referencial (+ costos)
-        tir: this.simulationInput.tasa,
-        van: (totalPagado - montoPrestamo).toFixed(2), // Valor presente neto simplificado
-        costoTotal: totalPagado.toFixed(2),
-
-        // --- Nuevos Campos ---
-        montoPrestamo: montoPrestamo.toFixed(2),
-        interesesTotales: interesesTotales.toFixed(2),
-        porcentajeFinanciado: porcentajeFinanciado.toFixed(2),
-        fechaFinCredito: fechaFin.toLocaleDateString('es-PE', { year: 'numeric', month: 'long' }),
-        ratioDeudaIngreso: ratio
-      };
-
-      this.loading = false;
+      return this.validationErrors.length === 0;
     },
 
     async saveSimulation() {
-      if (!this.simulationResult) {
-        alert("Primero realiza una simulación.");
+      if (!this.validateForm()) {
+        alert("Por favor corrija los siguientes errores:\n" + this.validationErrors.join("\n"));
         return;
       }
 
-      // Estructura exacta para el POST según tu ApiFake
-      const simulationPayload = {
-        clientId: 1, // Harcoded por ahora (simulando usuario logueado)
-        propertyId: 1, // Harcoded por ahora
-        simulationInput: {
-          ...this.simulationInput,
-          // Convertimos a string o number según requiera tu backend/json
-          periodoGracia: `${this.simulationInput.periodoGracia} meses`
-        },
-        simulationOutput: this.simulationResult,
-        createdAt: new Date().toISOString(),
-      };
-
       try {
-        await apiClient.post("/simulations", simulationPayload);
-        alert("Simulación guardada correctamente.");
-        this.loadSimulations(); // recargar historial
+        this.loading = true;
+
+        // Preparar datos para enviar
+        const simulationData = { ...this.simulationForm };
+
+        // Si no aplica bono, asegurar que sea 0
+        if (!simulationData.applyMiViviendaBonus) {
+          simulationData.bonusAmount = 0;
+        }
+
+        // Si usa TEA, TNA debe ser 0 y viceversa
+        if (simulationData.rateType === 1) {
+          simulationData.tna = 0;
+        } else {
+          simulationData.tea = 0;
+        }
+
+        const result = await SimulationsAssembler.createSimulation(simulationData);
+        
+        this.simulationResult = result;
+        alert("Simulación guardada correctamente");
+        
+        // Recargar historial
+        await this.loadSimulations();
+        
       } catch (error) {
         console.error("Error al guardar simulación:", error);
-        alert("Hubo un error al guardar.");
+        
+        if (error.message && error.message.includes('MiVivienda')) {
+          alert(`Error de validación: ${error.message}`);
+        } else if (error.response?.data?.title) {
+          alert(`Error: ${error.response.data.title}\n${error.response.data.detail || ''}`);
+        } else {
+          alert("Hubo un error al guardar la simulación");
+        }
+      } finally {
+        this.loading = false;
       }
     },
+
+    onPropertyChange() {
+      // Al seleccionar una propiedad, rellenar el principal con el precio
+      const property = this.properties.find(p => p.id === this.simulationForm.propertyId);
+      if (property) {
+        this.simulationForm.principal = property.price;
+        this.simulationForm.currency = property.currency;
+      }
+    },
+
+    onBankChange() {
+      // Al seleccionar un banco, rellenar la TEA con la tasa del banco
+      const bank = this.banks.find(b => b.id === this.simulationForm.bankId);
+      if (bank && bank.annualRateTea) {
+        this.simulationForm.tea = bank.annualRateTea;
+        this.simulationForm.rateType = 1; // TEA
+      }
+    },
+
+    getRateTypeName(type) {
+      return type === 1 ? 'TEA' : 'TNA';
+    },
+
+    getCurrencySymbol(currency) {
+      return currency === 1 ? 'S/' : '$';
+    },
+
+    getGraceTypeName(type) {
+      const types = { 0: 'Sin Gracia', 1: 'Total', 2: 'Parcial' };
+      return types[type] || '-';
+    }
   },
 };
 </script>
@@ -172,8 +207,8 @@ export default {
   <nav-bar></nav-bar>
   <div class="simulator-container">
     <div class="header-section">
-      <h1>Simulador Hipotecario Pro</h1>
-      <p>Calcula tu cuota incluyendo seguros y bonos del estado.</p>
+      <h1>Simulador Hipotecario</h1>
+      <p>Crea simulaciones de crédito conectadas al backend</p>
     </div>
 
     <div class="simulator-content">
@@ -182,147 +217,204 @@ export default {
 
         <div class="form-grid">
           <div class="input-group">
-            <label>Valor Inmueble (S/)</label>
-            <input v-model.number="simulationInput.monto" type="number" placeholder="500000" />
-          </div>
-
-          <div class="input-group">
-            <label>Cuota Inicial (S/)</label>
-            <input v-model.number="simulationInput.cuotaInicial" type="number" placeholder="50000" />
-          </div>
-
-          <div class="input-group">
-            <label>Bono MiVivienda (S/)</label>
-            <input v-model.number="simulationInput.bonoMiVivienda" type="number" placeholder="0" />
-          </div>
-
-          <div class="input-group">
-            <label>Plazo (años)</label>
-            <input v-model.number="simulationInput.plazo" type="number" placeholder="20" />
-          </div>
-
-          <div class="input-group">
-            <label>Tasa de Interés (%)</label>
-            <input v-model.number="simulationInput.tasa" type="number" step="0.1" placeholder="8.5" />
-          </div>
-
-          <div class="input-group">
-            <label>Tipo de Tasa</label>
-            <select v-model="simulationInput.tipoTasa">
-              <option value="efectiva">Efectiva Anual (TEA)</option>
-              <option value="nominal">Nominal Anual (TNA)</option>
+            <label>Cliente *</label>
+            <select v-model="simulationForm.clientId" required>
+              <option value="">Seleccione un cliente</option>
+              <option v-for="client in clients" :key="client.id" :value="client.id">
+                {{ client.fullName }}
+              </option>
             </select>
           </div>
 
           <div class="input-group">
-            <label>Seg. Desgravamen (% mes)</label>
-            <input v-model.number="simulationInput.seguroDesgravamen" type="number" step="0.001" />
+            <label>Propiedad *</label>
+            <select v-model="simulationForm.propertyId" @change="onPropertyChange" required>
+              <option value="">Seleccione una propiedad</option>
+              <option v-for="property in properties" :key="property.id" :value="property.id">
+                {{ property.code }} - {{ property.title }}
+              </option>
+            </select>
           </div>
 
           <div class="input-group">
-            <label>Seg. Inmueble (% mes)</label>
-            <input v-model.number="simulationInput.seguroInmueble" type="number" step="0.001" />
+            <label>Banco *</label>
+            <select v-model.number="simulationForm.bankId" @change="onBankChange" required>
+              <option :value="0">Seleccione un banco</option>
+              <option v-for="bank in banks" :key="bank.id" :value="bank.id">
+                {{ bank.name }}
+              </option>
+            </select>
           </div>
 
           <div class="input-group">
-            <label>Periodo de Gracia</label>
-            <div class="gracia-controls">
-              <select v-model="simulationInput.periodoGracia" style="width: 40%">
-                <option :value="0">0 meses</option>
-                <option :value="3">3 meses</option>
-                <option :value="6">6 meses</option>
-              </select>
-              <select v-model="simulationInput.tipoPeriodoGracia" style="width: 55%">
-                <option value="sin gracia">N/A</option>
-                <option value="total">Total (Suma Cap.)</option>
-                <option value="parcial">Parcial (Paga Int.)</option>
-              </select>
-            </div>
+            <label>Monto Principal *</label>
+            <input v-model.number="simulationForm.principal" type="number" step="0.01" required />
           </div>
 
-          <div class="input-group full-width">
-            <label>Tu Ingreso Mensual (Referencial)</label>
-            <input v-model.number="ingresoMensualCliente" type="number" />
+          <div class="input-group">
+            <label>Moneda *</label>
+            <select v-model.number="simulationForm.currency">
+              <option :value="1">Soles (PEN)</option>
+              <option :value="2">Dólares (USD)</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Tipo de Tasa *</label>
+            <select v-model.number="simulationForm.rateType">
+              <option :value="1">TEA (Tasa Efectiva Anual)</option>
+              <option :value="2">TNA (Tasa Nominal Anual)</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>{{ simulationForm.rateType === 1 ? 'TEA (%)' : 'TNA (%)' }} *</label>
+            <input 
+              v-if="simulationForm.rateType === 1" 
+              v-model.number="simulationForm.tea" 
+              type="number" 
+              step="0.01" 
+              required 
+            />
+            <input 
+              v-else 
+              v-model.number="simulationForm.tna" 
+              type="number" 
+              step="0.01" 
+              required 
+            />
+          </div>
+
+          <div class="input-group">
+            <label>Capitalización al Año</label>
+            <input v-model.number="simulationForm.capitalizationPerYear" type="number" />
+          </div>
+
+          <div class="input-group">
+            <label>Plazo (meses) *</label>
+            <input v-model.number="simulationForm.termMonths" type="number" required />
+          </div>
+
+          <div class="input-group">
+            <label>Tipo de Gracia</label>
+            <select v-model.number="simulationForm.graceType">
+              <option :value="0">Sin Gracia</option>
+              <option :value="1">Total</option>
+              <option :value="2">Parcial</option>
+            </select>
+          </div>
+
+          <div class="input-group">
+            <label>Meses de Gracia</label>
+            <input v-model.number="simulationForm.graceMonths" type="number" :disabled="simulationForm.graceType === 0" />
+          </div>
+
+          <div class="input-group">
+            <label>Fecha de Inicio</label>
+            <input v-model="simulationForm.startDate" type="date" />
+          </div>
+
+          <div class="input-group checkbox-group">
+            <label>
+              <input type="checkbox" v-model="simulationForm.applyMiViviendaBonus" />
+              Aplicar Bono MiVivienda
+            </label>
+          </div>
+
+          <div class="input-group" v-if="simulationForm.applyMiViviendaBonus">
+            <label>Monto Bono MiVivienda *</label>
+            <input v-model.number="simulationForm.bonusAmount" type="number" step="0.01" />
+            <small>Debe ser mayor a 0 y menor al monto principal</small>
+          </div>
+
+          <div class="input-group">
+            <label>Seguro Desgravamen (% mensual)</label>
+            <input v-model.number="simulationForm.lifeInsuranceRateMonthly" type="number" step="0.001" />
+          </div>
+
+          <div class="input-group">
+            <label>Seguro Inmueble (% anual)</label>
+            <input v-model.number="simulationForm.riskInsuranceRateAnnual" type="number" step="0.001" />
+          </div>
+
+          <div class="input-group">
+            <label>Comisiones Mensuales</label>
+            <input v-model.number="simulationForm.feesMonthly" type="number" step="0.01" />
           </div>
         </div>
 
-        <button @click="simulate" class="simulate-btn" :disabled="loading">
-          {{ loading ? "Calculando..." : "Calcular Cuota" }}
+        <button @click="saveSimulation" class="simulate-btn" :disabled="loading">
+          {{ loading ? "Guardando..." : "Guardar Simulación" }}
         </button>
       </div>
 
       <div v-if="simulationResult" class="result-section">
-        <h2>Resumen Financiero</h2>
+        <h2>Resultados</h2>
 
         <div class="main-result">
-          <span class="label">Cuota Mensual Estimada</span>
-          <span class="amount">S/ {{ simulationResult.cuotaMensual }}</span>
+          <span class="label">Cuota Mensual</span>
+          <span class="amount">{{ getCurrencySymbol(simulationResult.currency) }} {{ simulationResult.monthlyPayment?.toFixed(2) }}</span>
         </div>
 
         <div class="details-grid">
           <div class="detail-item">
-            <span>Monto Préstamo:</span>
-            <strong>S/ {{ simulationResult.montoPrestamo }}</strong>
+            <span>TEM:</span>
+            <strong>{{ simulationResult.tem?.toFixed(4) }}%</strong>
           </div>
           <div class="detail-item">
-            <span>Financiamiento:</span>
-            <strong>{{ simulationResult.porcentajeFinanciado }}%</strong>
+            <span>TCEA:</span>
+            <strong>{{ simulationResult.tcea?.toFixed(2) }}%</strong>
           </div>
           <div class="detail-item">
-            <span>TCEA Ref.:</span>
-            <strong>{{ simulationResult.tcea }}%</strong>
+            <span>TIR:</span>
+            <strong>{{ simulationResult.tir?.toFixed(2) }}%</strong>
+          </div>
+          <div class="detail-item">
+            <span>VAN:</span>
+            <strong>{{ getCurrencySymbol(simulationResult.currency) }} {{ simulationResult.van?.toFixed(2) }}</strong>
           </div>
           <div class="detail-item">
             <span>Intereses Totales:</span>
-            <strong>S/ {{ simulationResult.interesesTotales }}</strong>
+            <strong>{{ getCurrencySymbol(simulationResult.currency) }} {{ simulationResult.totalInterest?.toFixed(2) }}</strong>
           </div>
           <div class="detail-item">
-            <span>Ratio Deuda/Ingreso:</span>
-            <strong :class="{'warning': simulationResult.ratioDeudaIngreso > 0.4}">
-              {{ (simulationResult.ratioDeudaIngreso * 100).toFixed(1) }}%
-            </strong>
-          </div>
-          <div class="detail-item">
-            <span>Fin del Crédito:</span>
-            <strong>{{ simulationResult.fechaFinCredito }}</strong>
+            <span>Costo Total:</span>
+            <strong>{{ getCurrencySymbol(simulationResult.currency) }} {{ simulationResult.totalCost?.toFixed(2) }}</strong>
           </div>
         </div>
-
-        <div class="total-cost">
-          Costo Total (Capital + Int + Seg): S/ {{ simulationResult.costoTotal }}
-        </div>
-
-        <button @click="saveSimulation" class="save-btn">
-          Guardar Simulación
-        </button>
       </div>
     </div>
 
     <div class="history-section">
-      <h2>Historial Reciente</h2>
+      <h2>Historial de Simulaciones</h2>
       <div v-if="loadingHistory" class="loading">Cargando datos...</div>
-      <table v-else class="history-table">
+      <table v-else-if="simulations.length > 0" class="history-table">
         <thead>
         <tr>
           <th>Fecha</th>
-          <th>Inmueble</th>
-          <th>Inicial</th>
-          <th>Préstamo</th>
-          <th>Cuota</th>
-          <th>TCEA</th>
+          <th>Cliente</th>
+          <th>Propiedad</th>
+          <th>Banco</th>
+          <th>Principal</th>
+          <th>Plazo</th>
+          <th>Tasa</th>
+          <th>Cuota Mensual</th>
         </tr>
         </thead>
         <tbody>
         <tr v-for="sim in simulations" :key="sim.id">
-          <td>{{ new Date(sim.createdAt).toLocaleDateString() }}</td>
-          <td>S/ {{ sim.simulationInput.monto }}</td>
-          <td>S/ {{ sim.simulationInput.cuotaInicial || 0 }}</td>
-          <td>S/ {{ sim.simulationOutput.montoPrestamo || '-' }}</td>
-          <td class="highlight">S/ {{ sim.simulationOutput.cuotaMensual }}</td>
-          <td>{{ sim.simulationOutput.tcea }}%</td>
+          <td>{{ new Date(sim.createdAtUtc).toLocaleDateString('es-PE') }}</td>
+          <td>{{ sim.clientName }}</td>
+          <td>{{ sim.propertyTitle }}</td>
+          <td>{{ sim.bankName }}</td>
+          <td>{{ getCurrencySymbol(sim.currency) }} {{ sim.principal?.toLocaleString() }}</td>
+          <td>{{ sim.termMonths }} meses</td>
+          <td>{{ getRateTypeName(sim.rateType) }}: {{ (sim.rateType === 1 ? sim.tea : sim.tna)?.toFixed(2) }}%</td>
+          <td class="highlight">{{ getCurrencySymbol(sim.currency) }} {{ sim.monthlyPayment?.toFixed(2) }}</td>
         </tr>
         </tbody>
       </table>
+      <p v-else class="no-data">No hay simulaciones registradas</p>
     </div>
   </div>
   <footer-content></footer-content>
@@ -369,20 +461,17 @@ export default {
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 20px;
 }
 
 .input-group { display: flex; flex-direction: column; }
-.input-group.full-width { grid-column: 1 / -1; }
 
 .input-group label {
   font-weight: 600;
   color: #475569;
   margin-bottom: 8px;
   font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .input-group input, .input-group select {
@@ -402,7 +491,28 @@ export default {
   box-shadow: 0 0 0 3px rgba(55, 127, 189, 0.1);
 }
 
-.gracia-controls { display: flex; gap: 10px; justify-content: space-between; }
+.input-group input:disabled {
+  background: #e2e8f0;
+  cursor: not-allowed;
+}
+
+.input-group small {
+  color: #64748b;
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
 
 .simulate-btn {
   width: 100%;
@@ -417,7 +527,8 @@ export default {
   cursor: pointer;
   transition: 0.2s;
 }
-.simulate-btn:hover { background-color: #255a8a; transform: translateY(-1px); }
+.simulate-btn:hover:not(:disabled) { background-color: #255a8a; transform: translateY(-1px); }
+.simulate-btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
 
 /* Resultados */
 .result-section {
@@ -451,31 +562,14 @@ export default {
 .detail-item { display: flex; flex-direction: column; font-size: 14px; }
 .detail-item span { color: #64748b; margin-bottom: 2px; }
 .detail-item strong { color: #334155; font-weight: 600; }
-.detail-item strong.warning { color: #ef4444; }
-
-.total-cost {
-  text-align: center;
-  font-size: 13px;
-  color: #64748b;
-  padding-top: 15px;
-  border-top: 1px dashed #cbd5e1;
-}
-
-.save-btn {
-  width: 100%;
-  margin-top: 20px;
-  background-color: #e2e8f0;
-  color: #475569;
-  border: none;
-  border-radius: 10px;
-  padding: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.save-btn:hover { background-color: #cbd5e1; color: #1e293b; }
 
 /* Tabla Historial */
+.history-section h2 {
+  color: #255a8a;
+  margin-bottom: 20px;
+  font-size: 22px;
+}
+
 .history-table {
   width: 100%;
   border-collapse: collapse;
@@ -486,13 +580,38 @@ export default {
   font-size: 14px;
 }
 
-.history-table th { background-color: #f1f5f9; color: #475569; font-weight: 600; padding: 15px; text-align: left; }
-.history-table td { padding: 15px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+.history-table th { 
+  background-color: #377fbd; 
+  color: white; 
+  font-weight: 600; 
+  padding: 15px; 
+  text-align: left; 
+}
+.history-table td { 
+  padding: 15px; 
+  border-bottom: 1px solid #f1f5f9; 
+  color: #334155; 
+}
 .history-table tr:last-child td { border-bottom: none; }
 .history-table .highlight { font-weight: 700; color: #377fbd; }
+
+.loading {
+  text-align: center;
+  padding: 30px;
+  color: #377fbd;
+  font-size: 16px;
+}
+
+.no-data {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+  font-size: 16px;
+}
 
 @media (max-width: 768px) {
   .simulator-content { flex-direction: column; }
   .result-section { width: 100%; }
+  .form-grid { grid-template-columns: 1fr; }
 }
 </style>
