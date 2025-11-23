@@ -16,10 +16,7 @@ const preferences = reactive({
   defaultRateType: 1,
 })
 const loading = ref(true)
-
-// Modal de editar perfil
-const showProfileModal = ref(false)
-const editableProfile = reactive({})
+const errorMessage = ref("")
 
 // Modal de añadir/editar entidad
 const showEntityModal = ref(false)
@@ -35,14 +32,13 @@ const entityForm = reactive({
 onMounted(async () => {
   try {
     loading.value = true
+    errorMessage.value = ""
     
     // Cargar perfil y preferencias
     const profileData = await SettingsAssembler.getProfile()
     profile.value = profileData
-    
-    const preferencesData = await SettingsAssembler.getPreferences()
-    preferences.defaultCurrency = preferencesData.defaultCurrency
-    preferences.defaultRateType = preferencesData.defaultRateType
+    preferences.defaultCurrency = profileData.defaultCurrency || 1
+    preferences.defaultRateType = profileData.defaultRateType || 1
     
     // Cargar entidades financieras
     if (permissions.canManageBanks.value) {
@@ -50,6 +46,7 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error("Error cargando configuraciones:", error)
+    errorMessage.value = error.response?.data?.title || "No se pudo cargar la configuración"
     if (error.response?.data?.title) {
       alert(`Error: ${error.response.data.title}`)
     }
@@ -61,29 +58,9 @@ onMounted(async () => {
 const loadFinancialEntities = async () => {
   try {
     const result = await SettingsAssembler.getFinancialEntities()
-    financialEntities.value = result.data
+    financialEntities.value = result
   } catch (error) {
     console.error("Error cargando entidades:", error)
-  }
-}
-
-// Editar perfil
-const openEditProfile = () => {
-  Object.assign(editableProfile, profile.value)
-  showProfileModal.value = true
-}
-
-const saveProfile = async () => {
-  try {
-    await SettingsAssembler.updateProfile(editableProfile)
-    Object.assign(profile.value, editableProfile)
-    showProfileModal.value = false
-    alert("Perfil actualizado correctamente")
-  } catch (error) {
-    console.error("Error al actualizar perfil:", error)
-    if (error.response?.data?.title) {
-      alert(`Error: ${error.response.data.title}`)
-    }
   }
 }
 
@@ -165,57 +142,55 @@ const deleteEntity = async (entity) => {
 
 <template>
   <nav-bar></nav-bar>
-  <div class="tittle">
-    <h1><strong>CONFIGURACIÓN</strong></h1>
-  </div>
+  <div class="settings-page">
+    <h1 class="page-title">Settings</h1>
 
-  <div v-if="loading" class="loading-container">
-    <p>Cargando configuración...</p>
-  </div>
-
-  <div v-else class="settings-container">
-    <!-- Panel izquierdo -->
-    <div class="left-panel">
-      <div class="profile-card">
-        <h2>Mi Perfil</h2>
-        <div class="profile-avatar">{{ profile.firstName?.charAt(0) }}{{ profile.lastName?.charAt(0) }}</div>
-        <div class="profile-info">
-          <div class="info-item"><label>Usuario:</label> <span>{{ profile.username }}</span></div>
-          <div class="info-item"><label>Nombres:</label> <span>{{ profile.firstName }}</span></div>
-          <div class="info-item"><label>Apellidos:</label> <span>{{ profile.lastName }}</span></div>
-          <div class="info-item"><label>DNI:</label> <span>{{ profile.dni }}</span></div>
-          <div class="info-item"><label>Teléfono:</label> <span>{{ profile.phone }}</span></div>
-          <div class="info-item"><label>Correo:</label> <span>{{ profile.email }}</span></div>
-        </div>
-        <button class="edit-btn" @click="openEditProfile">Editar Perfil</button>
-      </div>
+    <div v-if="loading" class="loading-container">
+      <p>Cargando configuración...</p>
     </div>
+    <div v-else-if="errorMessage" class="loading-container">
+      <p>{{ errorMessage }}</p>
+    </div>
+    <div v-else class="settings-content">
+      <div class="top-section">
+        <div class="profile-card">
+          <h2>Mi Perfil</h2>
+          <div class="profile-avatar">{{ profile.firstName?.charAt(0) }}{{ profile.lastName?.charAt(0) }}</div>
+          <div class="profile-fields">
+            <div class="field"><span class="label">Usuario:</span> <span>{{ profile.username }}</span></div>
+            <div class="field"><span class="label">Nombres:</span> <span>{{ profile.firstName }}</span></div>
+            <div class="field"><span class="label">Apellidos:</span> <span>{{ profile.lastName }}</span></div>
+            <div class="field"><span class="label">DNI:</span> <span>{{ profile.dni }}</span></div>
+            <div class="field"><span class="label">Teléfono:</span> <span>{{ profile.phone }}</span></div>
+            <div class="field"><span class="label">Correo:</span> <span>{{ profile.email }}</span></div>
+            <div class="field"><span class="label">Rol:</span> <span>{{ profile.roleText || permissions.roleText.value }}</span></div>
+          </div>
+        </div>
 
-    <!-- Panel derecho -->
-    <div class="right-panel">
-      <div class="defaults-card">
-        <h2>Valores por Defecto</h2>
-        <div class="form-group">
-          <label>Moneda por defecto:</label>
-          <select v-model.number="preferences.defaultCurrency">
-            <option :value="1">Soles (PEN)</option>
-            <option :value="2">Dólares (USD)</option>
-          </select>
+        <div class="defaults-card">
+          <h2>Valores por Defecto</h2>
+          <div class="form-group">
+            <label>Moneda por defecto:</label>
+            <select v-model.number="preferences.defaultCurrency">
+              <option :value="1">Soles (PEN)</option>
+              <option :value="2">Dólares (USD)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Tipo de tasa por defecto:</label>
+            <select v-model.number="preferences.defaultRateType">
+              <option :value="1">TEA (Tasa Efectiva Anual)</option>
+              <option :value="2">TNA (Tasa Nominal Anual)</option>
+            </select>
+          </div>
+          <button class="save-preferences-btn" @click="savePreferences">Guardar Preferencias</button>
         </div>
-        <div class="form-group">
-          <label>Tipo de tasa por defecto:</label>
-          <select v-model.number="preferences.defaultRateType">
-            <option :value="1">TEA (Tasa Efectiva Anual)</option>
-            <option :value="2">TNA (Tasa Nominal Anual)</option>
-          </select>
-        </div>
-        <button class="save-preferences-btn" @click="savePreferences">Guardar Preferencias</button>
       </div>
 
       <div v-if="permissions.canManageBanks.value" class="financial-card">
         <div class="card-header">
           <h2>Entidades Financieras</h2>
-          <button class="add-btn" @click="openAddEntity">+ Añadir</button>
+          <button class="add-btn" @click="openAddEntity">+ Añadir Entidad</button>
         </div>
         <table v-if="financialEntities.length > 0" class="financial-table">
           <thead>
@@ -239,19 +214,6 @@ const deleteEntity = async (entity) => {
           </tbody>
         </table>
         <p v-else class="no-data-small">No hay entidades financieras registradas</p>
-      </div>
-    </div>
-
-    <!-- Modal editar perfil -->
-    <div v-if="showProfileModal" class="modal-backdrop">
-      <div class="modal">
-        <h3>Editar Perfil</h3>
-        <div class="form-group" v-for="(value, key) in editableProfile" :key="key">
-          <label>{{ key }}:</label>
-          <input v-model="editableProfile[key]" />
-        </div>
-        <button @click="saveProfile" class="save-btn">Guardar</button>
-        <button @click="showProfileModal=false" class="cancel-btn">Cancelar</button>
       </div>
     </div>
 
@@ -284,81 +246,151 @@ const deleteEntity = async (entity) => {
 </template>
 
 <style scoped>
-.settings-container {
-  display: flex;
-  gap: 2rem;
-  padding: 2rem;
+.settings-page {
+  min-height: 100vh;
+  background: #eef2f6;
+  padding: 30px 40px;
   font-family: 'Roboto', sans-serif;
-  color: #1e3a8a;
-  background-color: rgba(195, 195, 195, 0.53);
 }
 
-/* Panel izquierdo */
-.left-panel { width: 50%; }
-.profile-card {
-  background-color: #ffffff;
-  border-radius: 1rem;
-  padding: 1.5rem;
+.page-title {
+  text-align: center;
+  color: #255a8a;
+  font-size: 30px;
+  font-weight: 800;
+  margin-bottom: 20px;
+}
+
+.settings-content {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  gap: 20px;
 }
-.profile-avatar { 
-  border-radius: 50%; 
-  width: 120px; 
-  height: 120px; 
-  margin-bottom: 1rem;
+
+.top-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.profile-card, .defaults-card, .financial-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.08);
+}
+
+.profile-card h2, .defaults-card h2, .financial-card h2 {
+  margin: 0 0 16px;
+  color: #255a8a;
+}
+
+.profile-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
   background: linear-gradient(135deg, #377FBD, #5BA3D0);
-  color: white;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 48px;
+  font-size: 42px;
+  font-weight: 800;
+  margin: 10px auto 20px;
+}
+
+.profile-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.field {
+  background: #f6f9fc;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid #e4ecf4;
+  color: #1f2937;
+  font-size: 14px;
+}
+
+.label {
+  color: #255a8a;
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.defaults-card .form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 14px;
+  color: #1f2937;
+}
+
+.defaults-card select {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
   font-weight: 600;
 }
-.profile-info { width: 100%; margin-top: 1rem; }
-.info-item { display: flex; justify-content: space-between; margin-bottom: 0.5rem; }
-.info-item label { color: #3b82f6; font-weight: 500; }
-.edit-btn { background-color: #3b82f6; border:none; padding:0.6rem 1.2rem; border-radius:0.5rem; cursor:pointer; margin-top:1rem; color:white; }
-.edit-btn:hover { background-color:#2563eb; }
 
-/* Panel derecho */
-.right-panel {
-  width:50%;
-  display:flex;
-  flex-direction:column;
-  gap:1.5rem;
+.save-preferences-btn {
+  width: 100%;
+  background: #377fbd;
+  color: #fff;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease;
 }
-.defaults-card, .financial-card {
-  background-color: #ffffff;
-  border-radius:1rem;
-  padding:1.5rem;
+
+.save-preferences-btn:hover {
+  background: #2d6ba1;
 }
-.form-group {
-  display:flex;
-  flex-direction:column;
-  margin-top:1rem;
+
+.financial-card {
+  padding: 20px 24px;
 }
-.form-group input, .form-group select {
-  padding:0.5rem;
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.add-btn {
+  background-color:#10b981;
+  border:none;
+  padding:0.6rem 1.2rem;
   border-radius:0.5rem;
-  border:1px solid #3b82f6;
-  background: #c8c8c8;
-  color:#1e3a8a;
+  cursor:pointer;
+  color:white;
+  font-size: 14px;
+  font-weight: 600;
 }
+.add-btn:hover {
+  background-color:#059669;
+}
+
 .financial-table {
   width:100%;
   border-collapse:collapse;
   margin-top:1rem;
 }
+.financial-table th, .financial-table td {
+  text-align:left;
+  padding: 12px 10px;
+  border-bottom: 1px solid #e5e7eb;
+}
 .financial-table th {
   color:#1e3a8a;
-  padding:0.7rem;
-  text-align:left;
-}
-.financial-table td {
-  padding:0.7rem;
-  text-align:left;
+  font-weight: 700;
+  background: #f0f4f8;
 }
 .icon-btn {
   background:none;
@@ -371,48 +403,7 @@ const deleteEntity = async (entity) => {
 .icon-btn.delete {
   color:#ef4444;
 }
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
 
-.card-header h2 {
-  margin: 0;
-}
-
-.add-btn {
-  background-color:#10b981;
-  border:none;
-  padding:0.6rem 1.2rem;
-  border-radius:0.5rem;
-  cursor:pointer;
-  color:white;
-  font-size: 14px;
-  font-weight: 500;
-}
-.add-btn:hover {
-  background-color:#059669;
-}
-
-.save-preferences-btn {
-  background-color:#377fbd;
-  border:none;
-  padding:0.7rem 1.5rem;
-  border-radius:0.5rem;
-  cursor:pointer;
-  margin-top:1.5rem;
-  color:white;
-  width: 100%;
-  font-size: 15px;
-  font-weight: 600;
-}
-.save-preferences-btn:hover {
-  background-color:#2d6ba1;
-}
-
-/* Modal */
 .modal-backdrop {
   position: fixed;
   inset:0;
@@ -441,14 +432,6 @@ const deleteEntity = async (entity) => {
 .cancel-btn { background:#ef4444; color:white; border:none; padding:0.5rem 1rem; border-radius:0.5rem; cursor:pointer; margin-top:0.5rem;  }
 .save-btn:hover { background:#2563eb; }
 .cancel-btn:hover { background:#b91c1c; }
-.tittle{
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  font-family: "Roboto", sans-serif;
-  margin-top: 10px;
-  font-size: 20px;
-}
 
 .loading-container {
   text-align: center;
@@ -469,5 +452,14 @@ const deleteEntity = async (entity) => {
   display: flex;
   gap: 10px;
   margin-top: 1rem;
+}
+
+@media (max-width: 1024px) {
+  .top-section {
+    grid-template-columns: 1fr;
+  }
+  .profile-fields {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

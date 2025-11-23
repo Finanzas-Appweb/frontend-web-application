@@ -22,9 +22,11 @@ export default {
       },
       searchQuery: "",
       loading: true,
+      errorMessage: "",
       showModal: false,
       isEditing: false,
       propertyForm: {
+        code: "",
         title: "",
         address: "",
         district: "",
@@ -41,10 +43,19 @@ export default {
   async mounted() {
     await this.loadProperties();
   },
+  computed: {
+    hasPrevious() {
+      return this.pagination?.hasPreviousPage ?? this.pagination.currentPage > 1;
+    },
+    hasNext() {
+      return this.pagination?.hasNextPage ?? this.pagination.currentPage < this.pagination.totalPages;
+    }
+  },
   methods: {
     async loadProperties() {
       try {
         this.loading = true;
+        this.errorMessage = "";
         const result = await PropertiesAssembler.getProperties({
           search: this.searchQuery,
           page: this.pagination.currentPage,
@@ -54,6 +65,7 @@ export default {
         this.pagination = result.pagination;
       } catch (error) {
         console.error("Error cargando propiedades:", error);
+        this.errorMessage = error.response?.data?.title || "No se pudo cargar la lista de propiedades";
         if (error.response?.data?.title) {
           alert(`Error: ${error.response.data.title}`);
         }
@@ -73,7 +85,14 @@ export default {
     },
 
     getPropertyType(type) {
-      return type === 1 ? 'Casa' : 'Departamento';
+      const types = {
+        1: 'Casa',
+        2: 'Departamento',
+        3: 'Terreno',
+        4: 'Local',
+        5: 'Oficina'
+      };
+      return types[type] || 'Otro';
     },
 
     getCurrencySymbol(currency) {
@@ -83,6 +102,7 @@ export default {
     openAddModal() {
       this.isEditing = false;
       this.propertyForm = {
+        code: "",
         title: "",
         address: "",
         district: "",
@@ -100,6 +120,7 @@ export default {
       this.isEditing = true;
       this.editingPropertyId = property.id;
       this.propertyForm = {
+        code: property.code,
         title: property.title,
         address: property.address,
         district: property.district,
@@ -108,18 +129,25 @@ export default {
         areaM2: property.areaM2,
         price: property.price,
         currency: property.currency,
-        imagesUrl: property.imagesUrl || ""
+        imagesUrl: Array.isArray(property.imagesUrl) ? property.imagesUrl.join(', ') : (property.images?.map(img => img.url).join(', ') || "")
       };
       this.showModal = true;
     },
 
     async saveProperty() {
       try {
+        const payload = {
+          ...this.propertyForm,
+          imagesUrl: (this.propertyForm.imagesUrl || "")
+              .split(",")
+              .map((u) => u.trim())
+              .filter((u) => !!u)
+        };
         if (this.isEditing) {
-          await PropertiesAssembler.updateProperty(this.editingPropertyId, this.propertyForm);
+          await PropertiesAssembler.updateProperty(this.editingPropertyId, payload);
           alert("Propiedad actualizada correctamente");
         } else {
-          await PropertiesAssembler.createProperty(this.propertyForm);
+          await PropertiesAssembler.createProperty(payload);
           alert("Propiedad creada correctamente");
         }
         this.showModal = false;
@@ -183,46 +211,45 @@ export default {
       <p>Cargando propiedades...</p>
     </div>
 
+    <div v-else-if="errorMessage" class="error">
+      <p>{{ errorMessage }}</p>
+    </div>
+
     <div v-else-if="properties.length === 0" class="no-data">
       <p>No se encontraron propiedades</p>
     </div>
 
-    <div v-else class="table-wrapper">
-      <table class="properties-table">
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Título</th>
-            <th>Ubicación</th>
-            <th>Tipo</th>
-            <th>Área</th>
-            <th>Precio</th>
-            <th>Consultas</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="property in properties" :key="property.id">
-            <td>{{ property.code }}</td>
-            <td>{{ property.title }}</td>
-            <td>{{ property.district }}, {{ property.province }}</td>
-            <td>{{ getPropertyType(property.type) }}</td>
-            <td>{{ property.areaM2 }} m²</td>
-            <td>{{ getCurrencySymbol(property.currency) }} {{ property.price?.toLocaleString() }}</td>
-            <td>{{ property.consultsCount || 0 }}</td>
-            <td class="actions-cell">
-              <button v-if="permissions.canUpdateProperty.value" @click="openEditModal(property)" class="btn-icon edit-btn" title="Editar">✏️</button>
-              <button v-if="permissions.canDeleteProperty.value" @click="deleteProperty(property)" class="btn-icon delete-btn" title="Eliminar">🗑️</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else>
+      <div class="cards-grid">
+        <div v-for="property in properties" :key="property.id" class="property-card">
+          <div class="image-wrapper">
+            <img :src="(property.images?.[0]?.url) || property.imagesUrl?.[0] || 'https://via.placeholder.com/300x180?text=Imagen+de+propiedad'" alt="Imagen de propiedad">
+          </div>
+          <div class="card-body">
+            <div class="card-header">
+              <div>
+                <p class="code">{{ property.code }}</p>
+                <h3>{{ property.title }}</h3>
+              </div>
+              <div class="card-actions">
+                <button v-if="permissions.canEditProperty.value" class="btn-icon edit-btn" @click="openEditModal(property)" title="Editar">✏️</button>
+                <button v-if="permissions.canDeleteProperty.value" class="btn-icon delete-btn" @click="deleteProperty(property)" title="Eliminar">🗑️</button>
+              </div>
+            </div>
+            <p class="address">{{ property.address }}</p>
+            <p class="address">{{ property.district }}, {{ property.province }}</p>
+            <p class="meta">Área: {{ property.areaM2 }} m²</p>
+            <p class="price">{{ getCurrencySymbol(property.currency) }} {{ property.price?.toLocaleString() }}</p>
+            <p class="meta">Consultas: {{ property.consultsCount || 0 }}</p>
+          </div>
+        </div>
+      </div>
 
       <!-- Paginación -->
       <div v-if="pagination.totalPages > 1" class="pagination">
         <button 
           @click="changePage(pagination.currentPage - 1)" 
-          :disabled="!pagination.hasPreviousPage"
+          :disabled="!hasPrevious"
           class="page-btn"
         >
           ← Anterior
@@ -233,7 +260,7 @@ export default {
         </span>
         <button 
           @click="changePage(pagination.currentPage + 1)" 
-          :disabled="!pagination.hasNextPage"
+          :disabled="!hasNext"
           class="page-btn"
         >
           Siguiente →
@@ -246,6 +273,10 @@ export default {
       <div class="modal-content">
         <h2>{{ isEditing ? 'Editar Propiedad' : 'Nueva Propiedad' }}</h2>
         <form @submit.prevent="saveProperty">
+          <div class="form-group">
+            <label>Código *</label>
+            <input v-model="propertyForm.code" type="text" required />
+          </div>
           <div class="form-group">
             <label>Título *</label>
             <input v-model="propertyForm.title" type="text" required />
@@ -388,32 +419,6 @@ export default {
   padding: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   overflow-x: auto;
-}
-
-.properties-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 900px;
-}
-
-.properties-table thead th {
-  background-color: #377fbd;
-  color: white;
-  padding: 15px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.properties-table tbody td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 14px;
-  color: #333;
-}
-
-.properties-table tbody tr:hover {
-  background-color: #f0f9ff;
 }
 
 .actions-cell {
@@ -596,5 +601,90 @@ export default {
   margin-top: 50px;
   color: #666;
   font-size: 16px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.property-card {
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 20px rgba(55, 127, 189, 0.15);
+  border: 1px solid #e5eff8;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-wrapper {
+  width: 100%;
+  height: 150px;
+  background: #e5f2fb;
+}
+
+.image-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.card-body {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.code {
+  color: #255a8a;
+  font-weight: 700;
+  margin: 0;
+}
+
+.card-body h3 {
+  margin: 2px 0 6px;
+  color: #1f2937;
+  font-size: 17px;
+}
+
+.address {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.meta {
+  margin: 2px 0;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.price {
+  margin: 6px 0 2px;
+  color: #255a8a;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.error {
+  text-align: center;
+  margin-top: 30px;
+  color: #c53030;
+  font-weight: 600;
 }
 </style>

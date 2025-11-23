@@ -1,7 +1,11 @@
 export class EntitySelection {
-    constructor({ id = "", name = "", percentage = 0 }) {
-        this.id = id;
-        this.name = name;
+    constructor({
+        bankName = "",
+        count = 0,
+        percentage = 0
+    }) {
+        this.bankName = bankName;
+        this.count = count;
         this.percentage = percentage;
     }
 }

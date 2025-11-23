@@ -1,9 +1,18 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Home, FileText, Calculator , Bus, Building, Activity, Users, LogOut, X, Menu, Settings } from 'lucide-vue-next'
+import { useRouter } from 'vue-router'
+import { Home, Calculator , Bus, Building, Users, LogOut, X, Menu, Settings } from 'lucide-vue-next'
 
 const isOpen = ref(false)
 const toggleMenu = () => (isOpen.value = !isOpen.value)
+const router = useRouter()
+
+const handleLogout = () => {
+  localStorage.removeItem('user-token')
+  localStorage.removeItem('user-data')
+  isOpen.value = false
+  router.push('/login')
+}
 
 // Debug: Verifica en consola si se monta
 onMounted(() => {
@@ -80,12 +89,10 @@ onMounted(() => {
         <pv-button class="en-btn" @click="$i18n.locale = 'en'">EN</pv-button>
         <pv-button class="es-btn" @click="$i18n.locale = 'es'">ES</pv-button>
       </div>
-      <div class="logout1">
-        <router-link to="/login">
-          <LogOut />
-          Log Out
-        </router-link>
-      </div>
+      <button class="logout-btn" type="button" @click="handleLogout">
+        <LogOut />
+        Cerrar sesión
+      </button>
 
     </aside>
   </div>
@@ -191,22 +198,26 @@ onMounted(() => {
   box-shadow: 10px 5px 40px rgba(82, 159, 159, 0.28);
 }
 
-.logout {
+.logout-btn {
   display: flex;
   align-items: center;
   gap: 10px;
   color: #ffffff;
-  font-weight: 600;
+  font-weight: 700;
   margin-top: 30px;
   cursor: pointer;
   padding: 12px 10px;
   border-radius: 8px;
   transition: all 0.3s ease;
+  border: 1px solid rgba(255,255,255,0.2);
+  background: transparent;
+  width: 100%;
 }
 
-.logout1:hover {
-  background: #2D6697;
-  color: #ff4242;
+.logout-btn:hover {
+  background: #ffffff;
+  color: #2D6697;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.2);
 }
 
 .overlay {

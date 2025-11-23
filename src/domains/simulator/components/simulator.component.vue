@@ -48,6 +48,15 @@ export default {
   async mounted() {
     await this.loadInitialData();
   },
+  computed: {
+    miViviendaInvalid() {
+      if (!this.simulationForm.applyMiViviendaBonus) return false;
+      return !this.simulationForm.bonusAmount || this.simulationForm.bonusAmount <= 0 || this.simulationForm.bonusAmount >= this.simulationForm.principal;
+    },
+    submitDisabled() {
+      return this.loading || this.miViviendaInvalid;
+    }
+  },
   methods: {
     async loadInitialData() {
       try {
@@ -61,7 +70,7 @@ export default {
 
         // Cargar bancos
         const banksResult = await BanksAssembler.getBanks();
-        this.banks = banksResult.data;
+        this.banks = banksResult;
 
         // Cargar historial de simulaciones
         await this.loadSimulations();
@@ -157,6 +166,11 @@ export default {
       } catch (error) {
         console.error("Error al guardar simulación:", error);
         
+        if (error.response?.data?.errors) {
+          const messages = Object.values(error.response.data.errors).flat().join("\n");
+          alert(`Error de validación:\n${messages}`);
+          return;
+        }
         if (error.message && error.message.includes('MiVivienda')) {
           alert(`Error de validación: ${error.message}`);
         } else if (error.response?.data?.title) {
@@ -241,7 +255,7 @@ export default {
             <select v-model.number="simulationForm.bankId" @change="onBankChange" required>
               <option :value="0">Seleccione un banco</option>
               <option v-for="bank in banks" :key="bank.id" :value="bank.id">
-                {{ bank.name }}
+                {{ bank.name }} - TEA: {{ bank.annualRateTea }}%
               </option>
             </select>
           </div>
@@ -325,6 +339,7 @@ export default {
             <label>Monto Bono MiVivienda *</label>
             <input v-model.number="simulationForm.bonusAmount" type="number" step="0.01" />
             <small>Debe ser mayor a 0 y menor al monto principal</small>
+            <small v-if="miViviendaInvalid" class="error-text">Monto de bono inválido según las reglas del backend</small>
           </div>
 
           <div class="input-group">
@@ -343,9 +358,15 @@ export default {
           </div>
         </div>
 
-        <button @click="saveSimulation" class="simulate-btn" :disabled="loading">
+        <button @click="saveSimulation" class="simulate-btn" :disabled="submitDisabled">
           {{ loading ? "Guardando..." : "Guardar Simulación" }}
         </button>
+        <div v-if="validationErrors.length" class="validation-box">
+          <p>Por favor corrige:</p>
+          <ul>
+            <li v-for="(err, idx) in validationErrors" :key="idx">{{ err }}</li>
+          </ul>
+        </div>
       </div>
 
       <div v-if="simulationResult" class="result-section">
@@ -380,6 +401,34 @@ export default {
           <div class="detail-item">
             <span>Costo Total:</span>
             <strong>{{ getCurrencySymbol(simulationResult.currency) }} {{ simulationResult.totalCost?.toFixed(2) }}</strong>
+          </div>
+        </div>
+
+        <div v-if="simulationResult.amortizationSchedule?.length" class="schedule-section">
+          <h3>Tabla de Amortización</h3>
+          <div class="schedule-wrapper">
+            <table>
+              <thead>
+              <tr>
+                <th>Período</th>
+                <th>Fecha</th>
+                <th>Cuota</th>
+                <th>Interés</th>
+                <th>Amortización</th>
+                <th>Saldo</th>
+              </tr>
+              </thead>
+              <tbody>
+              <tr v-for="item in simulationResult.amortizationSchedule" :key="item.id || item.period">
+                <td>{{ item.period }}</td>
+                <td>{{ item.dueDate ? new Date(item.dueDate).toLocaleDateString('es-PE') : '-' }}</td>
+                <td>{{ getCurrencySymbol(simulationResult.currency) }} {{ item.installment?.toFixed(2) }}</td>
+                <td>{{ getCurrencySymbol(simulationResult.currency) }} {{ item.interest?.toFixed(2) }}</td>
+                <td>{{ getCurrencySymbol(simulationResult.currency) }} {{ item.principal?.toFixed(2) }}</td>
+                <td>{{ getCurrencySymbol(simulationResult.currency) }} {{ item.closingBalance?.toFixed(2) }}</td>
+              </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -502,6 +551,11 @@ export default {
   margin-top: 5px;
 }
 
+.error-text {
+  color: #c53030;
+  font-weight: 600;
+}
+
 .checkbox-group label {
   display: flex;
   align-items: center;
@@ -529,6 +583,20 @@ export default {
 }
 .simulate-btn:hover:not(:disabled) { background-color: #255a8a; transform: translateY(-1px); }
 .simulate-btn:disabled { background-color: #cbd5e1; cursor: not-allowed; }
+
+.validation-box {
+  margin-top: 16px;
+  background: #fef2f2;
+  border: 1px solid #fecdd3;
+  color: #b91c1c;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.validation-box ul {
+  margin: 8px 0 0 18px;
+}
 
 /* Resultados */
 .result-section {
@@ -607,6 +675,35 @@ export default {
   padding: 30px;
   color: #666;
   font-size: 16px;
+}
+
+.schedule-section {
+  margin-top: 20px;
+}
+
+.schedule-wrapper {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+}
+
+.schedule-section table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.schedule-section th, .schedule-section td {
+  padding: 10px;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 13px;
+  text-align: left;
+}
+
+.schedule-section th {
+  background: #f1f5f9;
+  color: #255a8a;
+  font-weight: 700;
 }
 
 @media (max-width: 768px) {

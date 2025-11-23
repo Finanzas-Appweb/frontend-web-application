@@ -1,5 +1,5 @@
 <script>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, nextTick } from "vue";
 import { ReportsAssembler } from "../domains/reports/services/reports.assembler.js";
 import { Chart, registerables } from "chart.js";
 import NavBar from "../shared/presentation/components/nav-bar.vue";
@@ -11,6 +11,7 @@ export default {
   name: "Home",
   components: {FooterContent, NavBar},
   setup() {
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
     const statistics = ref({
       registeredClients: 0,
       totalUsers: 0,
@@ -21,6 +22,7 @@ export default {
     const simulationsByMonth = ref([]);
     const entitySelection = ref([]);
     const loading = ref(true);
+    const errorMessage = ref("");
 
     let barChartInstance = null;
     let pieChartInstance = null;
@@ -28,25 +30,28 @@ export default {
     const loadData = async () => {
       try {
         loading.value = true;
+        errorMessage.value = "";
         
-        // Cargar resumen del dashboard
-        const summaryData = await ReportsAssembler.getReportsSummary();
-        statistics.value = summaryData.statistics;
-        lastActivities.value = summaryData.lastActivities.slice(0, 5);
+        const [
+          summaryData,
+          simsByMonthData,
+          entitySelectionData
+        ] = await Promise.all([
+          ReportsAssembler.getReportsSummary(),
+          ReportsAssembler.getSimulationsByMonth(12),
+          ReportsAssembler.getEntitySelection()
+        ]);
 
-        // Cargar datos para gráficos
-        const simsByMonthData = await ReportsAssembler.getSimulationsByMonth(6);
-        simulationsByMonth.value = simsByMonthData.data;
+        statistics.value = summaryData?.statistics || statistics.value;
+        lastActivities.value = summaryData?.lastActivities?.slice(0, 5) || [];
+        simulationsByMonth.value = simsByMonthData || [];
+        entitySelection.value = entitySelectionData || [];
 
-        const entitySelectionData = await ReportsAssembler.getEntitySelection();
-        entitySelection.value = entitySelectionData.data;
-
-        // Esperar a que el DOM esté listo
-        setTimeout(() => {
-          createCharts();
-        }, 100);
+        await nextTick();
+        createCharts();
       } catch (err) {
         console.error('Error al cargar datos del dashboard:', err);
+        errorMessage.value = err.response?.data?.title || "No se pudieron cargar los reportes";
         if (err.response?.data?.title) {
           alert(`Error: ${err.response.data.title}`);
         }
@@ -63,15 +68,14 @@ export default {
       if (simulationsByMonth.value.length > 0) {
         const ctx1 = document.getElementById("barChart");
         if (ctx1) {
-          const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
           barChartInstance = new Chart(ctx1.getContext("2d"), {
             type: "bar",
             data: {
-              labels: simulationsByMonth.value.map(m => `${monthNames[m.month - 1]} ${m.year}`),
+              labels: simulationsByMonth.value.map(m => `${monthNames[(m.month || 1) - 1]} ${m.year || ''}`),
               datasets: [
                 {
                   label: "Simulaciones",
-                  data: simulationsByMonth.value.map(m => m.count),
+                  data: simulationsByMonth.value.map(m => m.count ?? 0),
                   backgroundColor: "#4fc3f7",
                   borderRadius: 5,
                 },
@@ -95,7 +99,7 @@ export default {
               labels: entitySelection.value.map(e => e.bankName),
               datasets: [
                 {
-                  data: entitySelection.value.map(e => e.percentage),
+                  data: entitySelection.value.map(e => e.percentage ?? e.count ?? 0),
                   backgroundColor: ["#29b6f6", "#81d4fa", "#03a9f4", "#0288d1", "#4dd0e1"],
                 },
               ],
@@ -117,7 +121,7 @@ export default {
       loadData();
     });
 
-    return { statistics, lastActivities, loading };
+    return { statistics, lastActivities, loading, errorMessage, simulationsByMonth, entitySelection };
   },
 };
 </script>
@@ -127,6 +131,10 @@ export default {
   <div class="home-container">
     <div v-if="loading" class="loading-container">
       <p>Cargando dashboard...</p>
+    </div>
+
+    <div v-else-if="errorMessage" class="error-container">
+      <p>{{ errorMessage }}</p>
     </div>
 
     <template v-else>
@@ -184,11 +192,13 @@ export default {
       <div class="charts-container">
         <div class="chart-card">
           <h3>Simulaciones por mes</h3>
-          <canvas id="barChart"></canvas>
+          <canvas v-if="simulationsByMonth.length" id="barChart"></canvas>
+          <p v-else class="no-data">No hay datos de simulaciones por mes</p>
         </div>
         <div class="chart-card">
           <h3>Selección de entidades</h3>
-          <canvas id="pieChart"></canvas>
+          <canvas v-if="entitySelection.length" id="pieChart"></canvas>
+          <p v-else class="no-data">No hay datos de entidades</p>
         </div>
       </div>
 
@@ -315,5 +325,12 @@ tr:nth-child(even) {
   padding: 20px;
   color: #666;
   font-style: italic;
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px;
+  color: #c53030;
+  font-weight: 600;
 }
 </style>

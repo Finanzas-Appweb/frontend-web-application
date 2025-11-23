@@ -22,12 +22,12 @@ export default {
       },
       searchQuery: "",
       loading: true,
+      errorMessage: "",
       showModal: false,
       isEditing: false,
       clientForm: {
         firstName: "",
         lastName: "",
-        dni: "",
         email: "",
         phone: "",
         annualIncome: 0
@@ -38,10 +38,19 @@ export default {
   async mounted() {
     await this.loadClients();
   },
+  computed: {
+    hasPrevious() {
+      return this.pagination?.hasPreviousPage ?? this.pagination.currentPage > 1;
+    },
+    hasNext() {
+      return this.pagination?.hasNextPage ?? this.pagination.currentPage < this.pagination.totalPages;
+    }
+  },
   methods: {
     async loadClients() {
       try {
         this.loading = true;
+        this.errorMessage = "";
         const result = await ClientsAssembler.getClients({
           search: this.searchQuery,
           page: this.pagination.currentPage,
@@ -51,6 +60,7 @@ export default {
         this.pagination = result.pagination;
       } catch (error) {
         console.error("Error cargando clientes:", error);
+        this.errorMessage = error.response?.data?.title || "No se pudo cargar la lista de clientes";
         if (error.response?.data?.title) {
           alert(`Error: ${error.response.data.title}`);
         }
@@ -74,7 +84,6 @@ export default {
       this.clientForm = {
         firstName: "",
         lastName: "",
-        dni: "",
         email: "",
         phone: "",
         annualIncome: 0
@@ -88,7 +97,6 @@ export default {
       this.clientForm = {
         firstName: client.firstName,
         lastName: client.lastName,
-        dni: client.dni,
         email: client.email,
         phone: client.phone,
         annualIncome: client.annualIncome
@@ -127,6 +135,10 @@ export default {
         await this.loadClients();
       } catch (error) {
         console.error("Error al eliminar cliente:", error);
+        if (error.response?.status === 409) {
+          alert("No se puede eliminar el cliente porque tiene simulaciones asociadas");
+          return;
+        }
         if (error.response?.data?.title) {
           alert(`Error: ${error.response.data.title}`);
         } else {
@@ -152,7 +164,7 @@ export default {
             v-model="searchQuery"
             @keyup.enter="searchClients"
             type="text"
-            placeholder="Buscar por nombre, email o DNI..."
+            placeholder="Buscar por nombre, email o teléfono..."
             class="search-input"
         />
         <button @click="searchClients" class="search-btn">Buscar</button>
@@ -164,44 +176,36 @@ export default {
       <p>Cargando clientes...</p>
     </div>
 
+    <div v-else-if="errorMessage" class="error">
+      <p>{{ errorMessage }}</p>
+    </div>
+
     <div v-else-if="clients.length === 0" class="no-data">
       <p>No se encontraron clientes</p>
     </div>
 
-    <div v-else class="table-wrapper">
-      <table class="clients-table">
-        <thead>
-          <tr>
-            <th>Nombre Completo</th>
-            <th>DNI</th>
-            <th>Email</th>
-            <th>Teléfono</th>
-            <th>Ingreso Anual</th>
-            <th>Creado Por</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="client in clients" :key="client.id">
-            <td>{{ client.fullName }}</td>
-            <td>{{ client.dni }}</td>
-            <td>{{ client.email }}</td>
-            <td>{{ client.phone }}</td>
-            <td>S/ {{ client.annualIncome?.toLocaleString() || '0' }}</td>
-            <td>{{ client.createdByUserName }}</td>
-            <td class="actions-cell">
-              <button v-if="permissions.canUpdateClient.value" @click="openEditModal(client)" class="btn-icon edit-btn" title="Editar">✏️</button>
-              <button v-if="permissions.canDeleteClient.value" @click="deleteClient(client)" class="btn-icon delete-btn" title="Eliminar">🗑️</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+    <div v-else>
+      <div class="cards-grid">
+        <div v-for="client in clients" :key="client.id" class="client-card">
+          <div class="card-header">
+            <h3>{{ client.fullName }}</h3>
+            <div class="card-actions">
+              <button v-if="permissions.canEditClient.value" class="btn-icon edit-btn" @click="openEditModal(client)" title="Editar">✏️</button>
+              <button v-if="permissions.canDeleteClient.value" class="btn-icon delete-btn" @click="deleteClient(client)" title="Eliminar">🗑️</button>
+            </div>
+          </div>
+          <p><strong>Email:</strong> {{ client.email }}</p>
+          <p><strong>Teléfono:</strong> {{ client.phone }}</p>
+          <p><strong>Ingreso anual:</strong> S/ {{ client.annualIncome?.toLocaleString() || '0' }}</p>
+          <small v-if="client.createdByUserName" class="created-by">Creado por: {{ client.createdByUserName }}</small>
+        </div>
+      </div>
 
       <!-- Paginación -->
       <div v-if="pagination.totalPages > 1" class="pagination">
         <button 
           @click="changePage(pagination.currentPage - 1)" 
-          :disabled="!pagination.hasPreviousPage"
+          :disabled="!hasPrevious"
           class="page-btn"
         >
           ← Anterior
@@ -212,7 +216,7 @@ export default {
         </span>
         <button 
           @click="changePage(pagination.currentPage + 1)" 
-          :disabled="!pagination.hasNextPage"
+          :disabled="!hasNext"
           class="page-btn"
         >
           Siguiente →
@@ -236,10 +240,6 @@ export default {
             </div>
           </div>
           <div class="form-row">
-            <div class="form-group">
-              <label>DNI *</label>
-              <input v-model="clientForm.dni" type="text" maxlength="8" required />
-            </div>
             <div class="form-group">
               <label>Teléfono *</label>
               <input v-model="clientForm.phone" type="tel" required />
@@ -345,31 +345,6 @@ export default {
   border-radius: 15px;
   padding: 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-.clients-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.clients-table thead th {
-  background-color: #377fbd;
-  color: white;
-  padding: 15px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.clients-table tbody td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 14px;
-  color: #333;
-}
-
-.clients-table tbody tr:hover {
-  background-color: #f0f9ff;
 }
 
 .actions-cell {
@@ -546,5 +521,58 @@ export default {
   margin-top: 50px;
   color: #666;
   font-size: 16px;
+}
+
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 20px;
+}
+
+.client-card {
+  background: #ffffff;
+  border-radius: 15px;
+  padding: 18px;
+  box-shadow: 0 6px 16px rgba(55, 127, 189, 0.18);
+  border-left: 6px solid #377fbd;
+}
+
+.client-card h3 {
+  margin: 0;
+  color: #255a8a;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.client-card p {
+  margin: 6px 0;
+  color: #334155;
+  font-size: 14px;
+}
+
+.card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.card-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.created-by {
+  display: block;
+  margin-top: 8px;
+  color: #6b7280;
+}
+
+.error {
+  text-align: center;
+  margin-top: 30px;
+  color: #c53030;
+  font-weight: 600;
 }
 </style>

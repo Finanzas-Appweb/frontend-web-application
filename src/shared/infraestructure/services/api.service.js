@@ -102,11 +102,13 @@ export default {
     getReportsSummary() {
         return apiClient.get("/reports/summary");
     },
-    getMostConsultedProperties() {
-        return apiClient.get("/reports/most-consulted-properties");
+    getMostConsultedProperties(limit) {
+        const params = limit ? { limit } : undefined;
+        return apiClient.get("/reports/most-consulted-properties", { params });
     },
-    getSimulationsByMonth() {
-        return apiClient.get("/reports/simulations-by-month");
+    getSimulationsByMonth(months) {
+        const params = months ? { months } : undefined;
+        return apiClient.get("/reports/simulations-by-month", { params });
     },
     getEntitySelection() {
         return apiClient.get("/reports/entity-selection");

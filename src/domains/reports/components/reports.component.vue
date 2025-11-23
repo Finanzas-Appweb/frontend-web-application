@@ -30,26 +30,37 @@ const loading = ref(true);
 const topProperties = ref([]);
 const simulationsData = ref([]);
 const entityData = ref([]);
+const propertyConsultsData = ref([]);
+const errorMessage = ref("");
 
 // Cargar datos del backend
 onMounted(async () => {
   try {
     loading.value = true;
-    
-    // Cargar propiedades más consultadas
-    const propsResult = await ReportsAssembler.getMostConsultedProperties();
-    topProperties.value = propsResult.data;
-    
-    // Cargar simulaciones por mes (últimos 12 meses)
-    const simsResult = await ReportsAssembler.getSimulationsByMonth(12);
-    simulationsData.value = simsResult.data;
-    
-    // Cargar selección de entidades
-    const entityResult = await ReportsAssembler.getEntitySelection();
-    entityData.value = entityResult.data;
-    
+    errorMessage.value = "";
+
+    const [
+      ,
+      propsResult,
+      simsResult,
+      entityResult,
+      propConsultsResult
+    ] = await Promise.all([
+      ReportsAssembler.getReportsSummary(),
+      ReportsAssembler.getMostConsultedProperties(),
+      ReportsAssembler.getSimulationsByMonth(12),
+      ReportsAssembler.getEntitySelection(),
+      ReportsAssembler.getPropertyConsultsByMonth()
+    ]);
+
+    // Usamos summaryResult por si luego mostramos tarjetas; de momento solo almacenamos listas
+    topProperties.value = propsResult || [];
+    simulationsData.value = simsResult || [];
+    entityData.value = entityResult || [];
+    propertyConsultsData.value = propConsultsResult?.data || propConsultsResult || [];
   } catch (error) {
     console.error("Error cargando reportes:", error);
+    errorMessage.value = error.response?.data?.title || "No se pudieron cargar los reportes";
     if (error.response?.data?.title) {
       alert(`Error: ${error.response.data.title}`);
     }
@@ -62,14 +73,14 @@ onMounted(async () => {
 const simulationsByMonth = computed(() => {
   const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
   return {
-    labels: simulationsData.value.map(item => `${monthNames[item.month - 1]} ${item.year}`),
+    labels: simulationsData.value.map(item => `${monthNames[(item.month || 1) - 1]} ${item.year || ''}`),
     datasets: [
       {
         label: "Simulaciones",
         backgroundColor: "#377FBD",
         borderRadius: 8,
         barThickness: 26,
-        data: simulationsData.value.map(item => item.count),
+        data: simulationsData.value.map(item => item.count ?? 0),
       },
     ],
   };
@@ -84,7 +95,23 @@ const entitySelection = computed(() => {
         label: "Entidades",
         backgroundColor: ["#377FBD", "#5BA3D0", "#82C4F0", "#A4D8F6", "#4dd0e1"],
         hoverOffset: 12,
-        data: entityData.value.map(e => e.percentage),
+        data: entityData.value.map(e => e.percentage ?? e.count ?? 0),
+      },
+    ],
+  };
+});
+
+const propertyConsultsByMonth = computed(() => {
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return {
+    labels: propertyConsultsData.value.map(item => `${monthNames[(item.month || 1) - 1]} ${item.year || ''}`),
+    datasets: [
+      {
+        label: "Consultas a Propiedades",
+        backgroundColor: "#5BA3D0",
+        borderRadius: 8,
+        barThickness: 26,
+        data: propertyConsultsData.value.map(item => item.count ?? 0),
       },
     ],
   };
@@ -139,6 +166,9 @@ const verDetalles = (propiedad) => {
     <div v-if="loading" class="loading-container">
       <p>Cargando reportes...</p>
     </div>
+    <div v-else-if="errorMessage" class="loading-container">
+      <p>{{ errorMessage }}</p>
+    </div>
 
     <!-- CONTENEDOR PRINCIPAL -->
     <div v-else class="reports-layout">
@@ -159,7 +189,7 @@ const verDetalles = (propiedad) => {
               </tr>
               </thead>
               <tbody>
-              <tr v-for="prop in topProperties" :key="prop.propertyId">
+              <tr v-for="prop in topProperties" :key="prop.propertyId || prop.code">
                 <td>{{ prop.code }}</td>
                 <td>{{ prop.title }}</td>
                 <td>{{ getCurrencySymbol(prop.currency) }} {{ prop.price?.toLocaleString() }}</td>
@@ -193,6 +223,13 @@ const verDetalles = (propiedad) => {
             <Bar :data="simulationsByMonth" :options="chartOptions" />
           </div>
           <p v-else class="no-data-small">No hay datos de simulaciones</p>
+        </div>
+
+        <div class="report-card" v-if="propertyConsultsData.length">
+          <h2>Consultas de Propiedades por Mes</h2>
+          <div class="chart-wrapper">
+            <Bar :data="propertyConsultsByMonth" :options="chartOptions" />
+          </div>
         </div>
       </div>
     </div>
@@ -235,6 +272,13 @@ const verDetalles = (propiedad) => {
 
 .bottom-row .report-card {
   width: 100%; /* 100% debajo */
+}
+.bottom-row {
+  display: flex;
+  gap: 30px;
+}
+.bottom-row .report-card:last-child {
+  flex: 1;
 }
 
 /* TARJETAS */
