@@ -12,6 +12,7 @@ export class PropertiesAssembler {
             id: resource.id,
             code: resource.code,
             title: resource.title,
+            description: resource.description || "",
             address: resource.address,
             district: resource.district,
             province: resource.province,
@@ -30,6 +31,7 @@ export class PropertiesAssembler {
         return {
             code: property.code,
             title: property.title,
+            description: property.description || null,
             address: property.address,
             district: property.district,
             province: property.province,

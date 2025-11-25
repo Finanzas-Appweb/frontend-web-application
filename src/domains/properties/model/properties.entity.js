@@ -3,6 +3,7 @@ export class Property {
         id = "", 
         code = "", 
         title = "",
+        description = "", // New field - max 1000 chars
         address = "", 
         district = "",
         province = "",
@@ -19,6 +20,7 @@ export class Property {
         this.id = id;
         this.code = code;
         this.title = title;
+        this.description = description;
         this.address = address;
         this.district = district;
         this.province = province;

@@ -12,7 +12,9 @@ export class BanksAssembler {
             id: resource.id,
             name: resource.name,
             annualRateTea: resource.annualRateTea,
-            effectiveFrom: resource.effectiveFrom
+            annualRateTna: resource.annualRateTna,
+            effectiveFrom: resource.effectiveFrom,
+            isActive: resource.isActive ?? true
         });
     }
 
@@ -20,6 +22,7 @@ export class BanksAssembler {
         return {
             name: bank.name,
             annualRateTea: bank.annualRateTea,
+            annualRateTna: bank.annualRateTna,
             effectiveFrom: bank.effectiveFrom
         };
     }

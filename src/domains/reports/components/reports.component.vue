@@ -86,16 +86,16 @@ const simulationsByMonth = computed(() => {
   };
 });
 
-// Datos para gráfico de torta
+// Datos para gráfico de torta - mostrar count y percentage
 const entitySelection = computed(() => {
   return {
-    labels: entityData.value.map(e => e.bankName),
+    labels: entityData.value.map(e => `${e.bankName} (${e.count || 0})`),
     datasets: [
       {
         label: "Entidades",
         backgroundColor: ["#377FBD", "#5BA3D0", "#82C4F0", "#A4D8F6", "#4dd0e1"],
         hoverOffset: 12,
-        data: entityData.value.map(e => e.percentage ?? e.count ?? 0),
+        data: entityData.value.map(e => e.count ?? 0), // Usar count en lugar de percentage
       },
     ],
   };
@@ -146,6 +146,17 @@ const pieChartOptions = {
       position: "bottom",
       labels: { color: "#2D6BA1", font: { size: 13, weight: "500" } },
     },
+    tooltip: {
+      callbacks: {
+        label: function(context) {
+          const item = entityData.value[context.dataIndex];
+          if (item) {
+            return `${item.bankName}: ${item.count || 0} simulaciones (${(item.percentage || 0).toFixed(1)}%)`;
+          }
+          return context.label;
+        }
+      }
+    }
   },
 };
 

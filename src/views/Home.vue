@@ -1,5 +1,5 @@
 <script>
-import { ref, onMounted, nextTick } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { ReportsAssembler } from "../domains/reports/services/reports.assembler.js";
 import { Chart, registerables } from "chart.js";
 import NavBar from "../shared/presentation/components/nav-bar.vue";
@@ -23,6 +23,7 @@ export default {
     const entitySelection = ref([]);
     const loading = ref(true);
     const errorMessage = ref("");
+    const chartsReady = ref(false);
 
     let barChartInstance = null;
     let pieChartInstance = null;
@@ -47,75 +48,97 @@ export default {
         simulationsByMonth.value = simsByMonthData || [];
         entitySelection.value = entitySelectionData || [];
 
-        await nextTick();
-        createCharts();
       } catch (err) {
         console.error('Error al cargar datos del dashboard:', err);
         errorMessage.value = err.response?.data?.title || "No se pudieron cargar los reportes";
-        if (err.response?.data?.title) {
-          alert(`Error: ${err.response.data.title}`);
-        }
       } finally {
         loading.value = false;
+        chartsReady.value = true;
       }
     };
 
     const createCharts = () => {
       // Destruir charts anteriores si existen
-      if (barChartInstance) barChartInstance.destroy();
-      if (pieChartInstance) pieChartInstance.destroy();
-
-      if (simulationsByMonth.value.length > 0) {
-        const ctx1 = document.getElementById("barChart");
-        if (ctx1) {
-          barChartInstance = new Chart(ctx1.getContext("2d"), {
-            type: "bar",
-            data: {
-              labels: simulationsByMonth.value.map(m => `${monthNames[(m.month || 1) - 1]} ${m.year || ''}`),
-              datasets: [
-                {
-                  label: "Simulaciones",
-                  data: simulationsByMonth.value.map(m => m.count ?? 0),
-                  backgroundColor: "#4fc3f7",
-                  borderRadius: 5,
-                },
-              ],
-            },
-            options: {
-              responsive: true,
-              plugins: { legend: { display: false } },
-              scales: { y: { beginAtZero: true } },
-            },
-          });
-        }
+      if (barChartInstance) {
+        barChartInstance.destroy();
+        barChartInstance = null;
+      }
+      if (pieChartInstance) {
+        pieChartInstance.destroy();
+        pieChartInstance = null;
       }
 
-      if (entitySelection.value.length > 0) {
-        const ctx2 = document.getElementById("pieChart");
-        if (ctx2) {
-          pieChartInstance = new Chart(ctx2.getContext("2d"), {
-            type: "pie",
-            data: {
-              labels: entitySelection.value.map(e => e.bankName),
-              datasets: [
-                {
-                  data: entitySelection.value.map(e => e.percentage ?? e.count ?? 0),
-                  backgroundColor: ["#29b6f6", "#81d4fa", "#03a9f4", "#0288d1", "#4dd0e1"],
-                },
-              ],
-            },
-            options: { 
-              responsive: true,
-              plugins: {
-                legend: {
-                  position: 'bottom'
+      // Esperar un frame para asegurar que el DOM esté listo
+      setTimeout(() => {
+        if (simulationsByMonth.value.length > 0) {
+          const ctx1 = document.getElementById("barChart");
+          if (ctx1) {
+            barChartInstance = new Chart(ctx1.getContext("2d"), {
+              type: "bar",
+              data: {
+                labels: simulationsByMonth.value.map(m => `${monthNames[(m.month || 1) - 1]} ${m.year || ''}`),
+                datasets: [
+                  {
+                    label: "Simulaciones",
+                    data: simulationsByMonth.value.map(m => m.count ?? 0),
+                    backgroundColor: "#4fc3f7",
+                    borderRadius: 5,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'bottom' } },
+                scales: { y: { beginAtZero: true } },
+              },
+            });
+          }
+        }
+
+        if (entitySelection.value.length > 0) {
+          const ctx2 = document.getElementById("pieChart");
+          if (ctx2) {
+            pieChartInstance = new Chart(ctx2.getContext("2d"), {
+              type: "pie",
+              data: {
+                labels: entitySelection.value.map(e => `${e.bankName} (${e.count || 0})`),
+                datasets: [
+                  {
+                    data: entitySelection.value.map(e => e.count ?? e.percentage ?? 0),
+                    backgroundColor: ["#29b6f6", "#81d4fa", "#03a9f4", "#0288d1", "#4dd0e1"],
+                  },
+                ],
+              },
+              options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom'
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const item = entitySelection.value[context.dataIndex];
+                        return `${item.bankName}: ${item.count || 0} (${(item.percentage || 0).toFixed(1)}%)`;
+                      }
+                    }
+                  }
                 }
-              }
-            },
-          });
+              },
+            });
+          }
         }
-      }
+      }, 100);
     };
+
+    // Watch para crear charts cuando chartsReady cambie y loading sea false
+    watch([chartsReady, loading], ([ready, isLoading]) => {
+      if (ready && !isLoading) {
+        createCharts();
+      }
+    });
 
     onMounted(() => {
       loadData();
@@ -192,13 +215,17 @@ export default {
       <div class="charts-container">
         <div class="chart-card">
           <h3>Simulaciones por mes</h3>
-          <canvas v-if="simulationsByMonth.length" id="barChart"></canvas>
-          <p v-else class="no-data">No hay datos de simulaciones por mes</p>
+          <div class="chart-wrapper">
+            <canvas v-if="simulationsByMonth.length" id="barChart"></canvas>
+            <p v-else class="no-data">No hay datos de simulaciones por mes</p>
+          </div>
         </div>
         <div class="chart-card">
           <h3>Selección de entidades</h3>
-          <canvas v-if="entitySelection.length" id="pieChart"></canvas>
-          <p v-else class="no-data">No hay datos de entidades</p>
+          <div class="chart-wrapper">
+            <canvas v-if="entitySelection.length" id="pieChart"></canvas>
+            <p v-else class="no-data">No hay datos de entidades</p>
+          </div>
         </div>
       </div>
 
@@ -291,6 +318,10 @@ tr:nth-child(even) {
   margin-bottom: 1rem;
   color: #0277bd;
   text-align: center;
+}
+.chart-wrapper {
+  height: 280px;
+  position: relative;
 }
 
 /* Buttons */

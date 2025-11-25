@@ -5,8 +5,7 @@ export class Simulation {
         clientName = "",
         propertyId = "",
         propertyTitle = "",
-        bankId = 0,
-        bankName = "",
+        bank = null, // { id, name, annualRateTea, annualRateTna } or null
         principal = 0,
         currency = 1,
         rateType = 1,
@@ -37,8 +36,7 @@ export class Simulation {
         this.clientName = clientName;
         this.propertyId = propertyId;
         this.propertyTitle = propertyTitle;
-        this.bankId = bankId;
-        this.bankName = bankName;
+        this.bank = bank; // Object or null
         this.principal = principal;
         this.currency = currency; // 1 = PEN, 2 = USD
         this.rateType = rateType; // 1 = TEA, 2 = TNA

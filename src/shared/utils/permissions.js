@@ -120,8 +120,8 @@ export const canViewAllClients = () => {
  * Reglas de permisos para propiedades
  */
 export const canCreateProperty = () => {
-    // Solo Admin y Agent pueden crear propiedades
-    return isAdminOrAgent();
+    // Todos los usuarios autenticados pueden crear propiedades (actualizado según backend)
+    return isAuthenticated();
 };
 
 export const canEditProperty = () => {
@@ -143,8 +143,8 @@ export const canViewProperties = () => {
  * Reglas de permisos para bancos/entidades financieras
  */
 export const canManageBanks = () => {
-    // Solo Admin puede gestionar bancos
-    return isAdmin();
+    // Admin y Agent pueden gestionar bancos
+    return isAdminOrAgent();
 };
 
 /**

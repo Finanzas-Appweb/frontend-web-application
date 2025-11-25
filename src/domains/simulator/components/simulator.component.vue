@@ -16,11 +16,14 @@ export default {
       properties: [],
       banks: [],
       
+      // Banco seleccionado (para mostrar info de tasas)
+      selectedBank: null,
+      
       // Formulario de simulación
       simulationForm: {
         clientId: "",
         propertyId: "",
-        bankId: 0,
+        bankId: null, // null = tasa manual, number = banco seleccionado
         principal: 0,
         currency: 1, // 1 = PEN, 2 = USD
         rateType: 1, // 1 = TEA, 2 = TNA
@@ -49,6 +52,10 @@ export default {
     await this.loadInitialData();
   },
   computed: {
+    // Si hay banco seleccionado, las tasas vienen del backend automáticamente
+    useBankRates() {
+      return this.simulationForm.bankId && this.simulationForm.bankId > 0;
+    },
     miViviendaInvalid() {
       if (!this.simulationForm.applyMiViviendaBonus) return false;
       return !this.simulationForm.bonusAmount || this.simulationForm.bonusAmount <= 0 || this.simulationForm.bonusAmount >= this.simulationForm.principal;
@@ -100,19 +107,18 @@ export default {
       if (!this.simulationForm.propertyId) {
         this.validationErrors.push("Debe seleccionar una propiedad");
       }
-      if (!this.simulationForm.bankId || this.simulationForm.bankId === 0) {
-        this.validationErrors.push("Debe seleccionar un banco");
-      }
       if (!this.simulationForm.principal || this.simulationForm.principal <= 0) {
         this.validationErrors.push("El monto principal debe ser mayor a 0");
       }
       
-      // Validar tasa según tipo
-      if (this.simulationForm.rateType === 1 && (!this.simulationForm.tea || this.simulationForm.tea <= 0)) {
-        this.validationErrors.push("La TEA debe ser mayor a 0");
-      }
-      if (this.simulationForm.rateType === 2 && (!this.simulationForm.tna || this.simulationForm.tna <= 0)) {
-        this.validationErrors.push("La TNA debe ser mayor a 0");
+      // Si NO hay banco, validar tasas manuales
+      if (!this.useBankRates) {
+        if (this.simulationForm.rateType === 1 && (!this.simulationForm.tea || this.simulationForm.tea <= 0)) {
+          this.validationErrors.push("La TEA debe ser mayor a 0");
+        }
+        if (this.simulationForm.rateType === 2 && (!this.simulationForm.tna || this.simulationForm.tna <= 0)) {
+          this.validationErrors.push("La TNA debe ser mayor a 0");
+        }
       }
 
       if (!this.simulationForm.termMonths || this.simulationForm.termMonths <= 0) {
@@ -148,11 +154,21 @@ export default {
           simulationData.bonusAmount = 0;
         }
 
-        // Si usa TEA, TNA debe ser 0 y viceversa
-        if (simulationData.rateType === 1) {
-          simulationData.tna = 0;
+        // Si hay banco seleccionado, el backend usa las tasas del banco
+        // Si NO hay banco, enviar las tasas manuales
+        if (this.useBankRates) {
+          // Backend usará las tasas del banco
+          simulationData.tea = null;
+          simulationData.tna = null;
+          simulationData.capitalizationPerYear = null;
         } else {
-          simulationData.tea = 0;
+          // Sin banco - enviar tasas manuales
+          simulationData.bankId = null;
+          if (simulationData.rateType === 1) {
+            simulationData.tna = null;
+          } else {
+            simulationData.tea = null;
+          }
         }
 
         const result = await SimulationsAssembler.createSimulation(simulationData);
@@ -193,12 +209,28 @@ export default {
     },
 
     onBankChange() {
-      // Al seleccionar un banco, rellenar la TEA con la tasa del banco
-      const bank = this.banks.find(b => b.id === this.simulationForm.bankId);
-      if (bank && bank.annualRateTea) {
-        this.simulationForm.tea = bank.annualRateTea;
-        this.simulationForm.rateType = 1; // TEA
+      // Al seleccionar un banco, mostrar info de tasas
+      if (this.simulationForm.bankId && this.simulationForm.bankId > 0) {
+        const bank = this.banks.find(b => b.id === this.simulationForm.bankId);
+        this.selectedBank = bank || null;
+        // Pre-llenar tasa visible (referencia, el backend usará la real)
+        if (bank) {
+          this.simulationForm.tea = bank.annualRateTea;
+          this.simulationForm.tna = bank.annualRateTna || 0;
+        }
+      } else {
+        this.selectedBank = null;
+        // Limpiar tasas para ingreso manual
+        this.simulationForm.tea = 0;
+        this.simulationForm.tna = 0;
       }
+    },
+
+    formatRate(rate) {
+      if (!rate && rate !== 0) return '-';
+      // Si la tasa es menor a 1, asumimos que está en decimal (0.085 = 8.5%)
+      const percentage = rate < 1 ? rate * 100 : rate;
+      return percentage.toFixed(2) + '%';
     },
 
     getRateTypeName(type) {
@@ -212,6 +244,19 @@ export default {
     getGraceTypeName(type) {
       const types = { 0: 'Sin Gracia', 1: 'Total', 2: 'Parcial' };
       return types[type] || '-';
+    },
+
+    // Helper para obtener nombre del banco en historial (nuevo formato con objeto bank)
+    getBankName(sim) {
+      // Nuevo formato: sim.bank es un objeto { id, name, annualRateTea, annualRateTna }
+      if (sim.bank && sim.bank.name) {
+        return sim.bank.name;
+      }
+      // Fallback para formato antiguo (por si hay datos viejos)
+      if (sim.bankName) {
+        return sim.bankName;
+      }
+      return 'Tasa manual';
     }
   },
 };
@@ -251,13 +296,23 @@ export default {
           </div>
 
           <div class="input-group">
-            <label>Banco *</label>
-            <select v-model.number="simulationForm.bankId" @change="onBankChange" required>
-              <option :value="0">Seleccione un banco</option>
+            <label>Banco (opcional)</label>
+            <select v-model.number="simulationForm.bankId" @change="onBankChange">
+              <option :value="null">-- Tasa manual --</option>
               <option v-for="bank in banks" :key="bank.id" :value="bank.id">
-                {{ bank.name }} - TEA: {{ bank.annualRateTea }}%
+                {{ bank.name }}
               </option>
             </select>
+          </div>
+
+          <!-- Info del banco seleccionado -->
+          <div v-if="selectedBank" class="bank-info-card">
+            <h4>{{ selectedBank.name }}</h4>
+            <div class="bank-rates">
+              <span><strong>TEA:</strong> {{ formatRate(selectedBank.annualRateTea) }}</span>
+              <span><strong>TNA:</strong> {{ formatRate(selectedBank.annualRateTna) }}</span>
+            </div>
+            <small class="hint">Las tasas se aplicarán automáticamente del banco</small>
           </div>
 
           <div class="input-group">
@@ -275,28 +330,32 @@ export default {
 
           <div class="input-group">
             <label>Tipo de Tasa *</label>
-            <select v-model.number="simulationForm.rateType">
+            <select v-model.number="simulationForm.rateType" :disabled="useBankRates">
               <option :value="1">TEA (Tasa Efectiva Anual)</option>
               <option :value="2">TNA (Tasa Nominal Anual)</option>
             </select>
+            <small v-if="useBankRates" class="hint">Se usará según selección con tasa del banco</small>
           </div>
 
-          <div class="input-group">
+          <div class="input-group" v-if="!useBankRates">
             <label>{{ simulationForm.rateType === 1 ? 'TEA (%)' : 'TNA (%)' }} *</label>
             <input 
               v-if="simulationForm.rateType === 1" 
               v-model.number="simulationForm.tea" 
               type="number" 
-              step="0.01" 
+              step="0.0001" 
+              placeholder="Ej: 0.085 para 8.5%"
               required 
             />
             <input 
               v-else 
               v-model.number="simulationForm.tna" 
               type="number" 
-              step="0.01" 
+              step="0.0001"
+              placeholder="Ej: 0.0817 para 8.17%"
               required 
             />
+            <small class="hint">Ingrese en decimal. Ej: 0.085 = 8.5%</small>
           </div>
 
           <div class="input-group">
@@ -455,10 +514,10 @@ export default {
           <td>{{ new Date(sim.createdAtUtc).toLocaleDateString('es-PE') }}</td>
           <td>{{ sim.clientName }}</td>
           <td>{{ sim.propertyTitle }}</td>
-          <td>{{ sim.bankName }}</td>
+          <td>{{ getBankName(sim) }}</td>
           <td>{{ getCurrencySymbol(sim.currency) }} {{ sim.principal?.toLocaleString() }}</td>
           <td>{{ sim.termMonths }} meses</td>
-          <td>{{ getRateTypeName(sim.rateType) }}: {{ (sim.rateType === 1 ? sim.tea : sim.tna)?.toFixed(2) }}%</td>
+          <td>{{ getRateTypeName(sim.rateType) }}: {{ formatRate(sim.rateType === 1 ? sim.tea : sim.tna) }}</td>
           <td class="highlight">{{ getCurrencySymbol(sim.currency) }} {{ sim.monthlyPayment?.toFixed(2) }}</td>
         </tr>
         </tbody>
@@ -540,15 +599,55 @@ export default {
   box-shadow: 0 0 0 3px rgba(55, 127, 189, 0.1);
 }
 
-.input-group input:disabled {
+.input-group input:disabled, .input-group select:disabled {
   background: #e2e8f0;
   cursor: not-allowed;
+  color: #64748b;
 }
 
 .input-group small {
   color: #64748b;
   font-size: 12px;
   margin-top: 5px;
+}
+
+.input-group .hint {
+  color: #0369a1;
+  font-style: italic;
+}
+
+/* Bank info card cuando se selecciona un banco */
+.bank-info-card {
+  grid-column: span 2;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border: 1px solid #7dd3fc;
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.bank-info-card h4 {
+  margin: 0;
+  color: #0369a1;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.bank-info-card .bank-rates {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.bank-info-card .bank-rates span {
+  font-size: 14px;
+  color: #334155;
+}
+
+.bank-info-card .bank-rates strong {
+  color: #0284c7;
 }
 
 .error-text {

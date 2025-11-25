@@ -25,6 +25,7 @@ const entityForm = reactive({
   id: null,
   name: "", 
   annualRateTea: 0,
+  annualRateTna: 0,
   effectiveFrom: ""
 })
 
@@ -40,16 +41,11 @@ onMounted(async () => {
     preferences.defaultCurrency = profileData.defaultCurrency || 1
     preferences.defaultRateType = profileData.defaultRateType || 1
     
-    // Cargar entidades financieras
-    if (permissions.canManageBanks.value) {
-      await loadFinancialEntities()
-    }
+    // Cargar entidades financieras para TODOS los usuarios (visibles)
+    await loadFinancialEntities()
   } catch (error) {
     console.error("Error cargando configuraciones:", error)
     errorMessage.value = error.response?.data?.title || "No se pudo cargar la configuración"
-    if (error.response?.data?.title) {
-      alert(`Error: ${error.response.data.title}`)
-    }
   } finally {
     loading.value = false
   }
@@ -57,7 +53,7 @@ onMounted(async () => {
 
 const loadFinancialEntities = async () => {
   try {
-    const result = await SettingsAssembler.getFinancialEntities()
+    const result = await BanksAssembler.getBanks()
     financialEntities.value = result
   } catch (error) {
     console.error("Error cargando entidades:", error)
@@ -83,6 +79,7 @@ const openAddEntity = () => {
   entityForm.id = null
   entityForm.name = ""
   entityForm.annualRateTea = 0
+  entityForm.annualRateTna = 0
   entityForm.effectiveFrom = new Date().toISOString().split('T')[0]
   showEntityModal.value = true
 }
@@ -92,6 +89,7 @@ const openEditEntity = (entity) => {
   entityForm.id = entity.id
   entityForm.name = entity.name
   entityForm.annualRateTea = entity.annualRateTea
+  entityForm.annualRateTna = entity.annualRateTna || 0
   entityForm.effectiveFrom = entity.effectiveFrom ? entity.effectiveFrom.split('T')[0] : ""
   showEntityModal.value = true
 }
@@ -102,6 +100,7 @@ const saveEntity = async () => {
       await BanksAssembler.updateBank(entityForm.id, {
         name: entityForm.name,
         annualRateTea: entityForm.annualRateTea,
+        annualRateTna: entityForm.annualRateTna,
         effectiveFrom: entityForm.effectiveFrom
       })
       alert("Entidad actualizada correctamente")
@@ -109,6 +108,7 @@ const saveEntity = async () => {
       await BanksAssembler.createBank({
         name: entityForm.name,
         annualRateTea: entityForm.annualRateTea,
+        annualRateTna: entityForm.annualRateTna,
         effectiveFrom: entityForm.effectiveFrom
       })
       alert("Entidad creada correctamente")
@@ -138,12 +138,20 @@ const deleteEntity = async (entity) => {
     }
   }
 }
+
+// Helper para formatear tasa como porcentaje (el backend envía decimal ej: 0.085 = 8.5%)
+const formatRate = (rate) => {
+  if (!rate && rate !== 0) return '-'
+  // Si la tasa es menor a 1, asumimos que está en decimal (0.085 = 8.5%)
+  const percentage = rate < 1 ? rate * 100 : rate
+  return percentage.toFixed(2) + '%'
+}
 </script>
 
 <template>
   <nav-bar></nav-bar>
   <div class="settings-page">
-    <h1 class="page-title">Settings</h1>
+    <h1 class="page-title">Configuración</h1>
 
     <div v-if="loading" class="loading-container">
       <p>Cargando configuración...</p>
@@ -153,17 +161,33 @@ const deleteEntity = async (entity) => {
     </div>
     <div v-else class="settings-content">
       <div class="top-section">
+        <!-- Perfil agrandado -->
         <div class="profile-card">
           <h2>Mi Perfil</h2>
-          <div class="profile-avatar">{{ profile.firstName?.charAt(0) }}{{ profile.lastName?.charAt(0) }}</div>
+          <div class="profile-header">
+            <div class="profile-avatar">{{ profile.firstName?.charAt(0) }}{{ profile.lastName?.charAt(0) }}</div>
+            <div class="profile-name">
+              <h3>{{ profile.firstName }} {{ profile.lastName }}</h3>
+              <span class="role-badge">{{ profile.roleText || permissions.roleText.value }}</span>
+            </div>
+          </div>
           <div class="profile-fields">
-            <div class="field"><span class="label">Usuario:</span> <span>{{ profile.username }}</span></div>
-            <div class="field"><span class="label">Nombres:</span> <span>{{ profile.firstName }}</span></div>
-            <div class="field"><span class="label">Apellidos:</span> <span>{{ profile.lastName }}</span></div>
-            <div class="field"><span class="label">DNI:</span> <span>{{ profile.dni }}</span></div>
-            <div class="field"><span class="label">Teléfono:</span> <span>{{ profile.phone }}</span></div>
-            <div class="field"><span class="label">Correo:</span> <span>{{ profile.email }}</span></div>
-            <div class="field"><span class="label">Rol:</span> <span>{{ profile.roleText || permissions.roleText.value }}</span></div>
+            <div class="field">
+              <span class="label">👤 Usuario:</span> 
+              <span class="value">{{ profile.username }}</span>
+            </div>
+            <div class="field">
+              <span class="label">🪪 DNI:</span> 
+              <span class="value">{{ profile.dni }}</span>
+            </div>
+            <div class="field">
+              <span class="label">📧 Correo:</span> 
+              <span class="value">{{ profile.email }}</span>
+            </div>
+            <div class="field">
+              <span class="label">📱 Teléfono:</span> 
+              <span class="value">{{ profile.phone || '-' }}</span>
+            </div>
           </div>
         </div>
 
@@ -187,26 +211,29 @@ const deleteEntity = async (entity) => {
         </div>
       </div>
 
-      <div v-if="permissions.canManageBanks.value" class="financial-card">
+      <!-- Bancos visibles para TODOS, pero solo editable por Admin/Agent -->
+      <div class="financial-card">
         <div class="card-header">
           <h2>Entidades Financieras</h2>
-          <button class="add-btn" @click="openAddEntity">+ Añadir Entidad</button>
+          <button v-if="permissions.canManageBanks.value" class="add-btn" @click="openAddEntity">+ Añadir Entidad</button>
         </div>
         <table v-if="financialEntities.length > 0" class="financial-table">
           <thead>
           <tr>
             <th>Entidad</th>
-            <th>Tasa Anual (TEA %)</th>
+            <th>TEA</th>
+            <th>TNA</th>
             <th>Vigente Desde</th>
-            <th>Acciones</th>
+            <th v-if="permissions.canManageBanks.value">Acciones</th>
           </tr>
           </thead>
           <tbody>
           <tr v-for="entity in financialEntities" :key="entity.id">
             <td>{{ entity.name }}</td>
-            <td>{{ entity.annualRateTea?.toFixed(2) }}%</td>
+            <td>{{ formatRate(entity.annualRateTea) }}</td>
+            <td>{{ formatRate(entity.annualRateTna) }}</td>
             <td>{{ entity.effectiveFrom ? new Date(entity.effectiveFrom).toLocaleDateString('es-PE') : '-' }}</td>
-            <td>
+            <td v-if="permissions.canManageBanks.value">
               <button class="icon-btn" @click="openEditEntity(entity)" title="Editar">✏️</button>
               <button class="icon-btn delete" @click="deleteEntity(entity)" title="Eliminar">🗑️</button>
             </td>
@@ -227,8 +254,14 @@ const deleteEntity = async (entity) => {
             <input v-model="entityForm.name" required />
           </div>
           <div class="form-group">
-            <label>Tasa Anual (TEA %):</label>
-            <input v-model.number="entityForm.annualRateTea" type="number" step="0.01" required />
+            <label>TEA (Tasa Efectiva Anual %):</label>
+            <input v-model.number="entityForm.annualRateTea" type="number" step="0.0001" min="0" required placeholder="Ej: 0.085 para 8.5%" />
+            <small class="hint">Ingrese en decimal. Ej: 0.085 = 8.5%</small>
+          </div>
+          <div class="form-group">
+            <label>TNA (Tasa Nominal Anual %):</label>
+            <input v-model.number="entityForm.annualRateTna" type="number" step="0.0001" min="0" required placeholder="Ej: 0.0817 para 8.17%" />
+            <small class="hint">Ingrese en decimal. Ej: 0.0817 = 8.17%</small>
           </div>
           <div class="form-group">
             <label>Vigente Desde:</label>
@@ -258,82 +291,123 @@ const deleteEntity = async (entity) => {
   color: #255a8a;
   font-size: 30px;
   font-weight: 800;
-  margin-bottom: 20px;
+  margin-bottom: 25px;
 }
 
 .settings-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 25px;
 }
 
 .top-section {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  grid-template-columns: 1.2fr 0.8fr;
+  gap: 25px;
 }
 
 .profile-card, .defaults-card, .financial-card {
   background: #ffffff;
   border-radius: 16px;
-  padding: 20px;
+  padding: 25px;
   box-shadow: 0 10px 24px rgba(0,0,0,0.08);
 }
 
 .profile-card h2, .defaults-card h2, .financial-card h2 {
-  margin: 0 0 16px;
+  margin: 0 0 20px;
   color: #255a8a;
+  font-size: 20px;
+}
+
+/* Perfil mejorado */
+.profile-header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 2px solid #e4ecf4;
 }
 
 .profile-avatar {
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
   background: linear-gradient(135deg, #377FBD, #5BA3D0);
   color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 42px;
+  font-size: 36px;
   font-weight: 800;
-  margin: 10px auto 20px;
+  flex-shrink: 0;
+}
+
+.profile-name h3 {
+  margin: 0 0 8px;
+  color: #1f2937;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.role-badge {
+  background: linear-gradient(135deg, #377FBD, #5BA3D0);
+  color: white;
+  padding: 4px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .profile-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 12px;
 }
 
 .field {
   background: #f6f9fc;
-  padding: 10px;
-  border-radius: 10px;
+  padding: 14px 16px;
+  border-radius: 12px;
   border: 1px solid #e4ecf4;
-  color: #1f2937;
-  font-size: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.label {
+.field .label {
   color: #255a8a;
   font-weight: 700;
-  margin-right: 4px;
+  font-size: 13px;
+}
+
+.field .value {
+  color: #1f2937;
+  font-size: 15px;
+  font-weight: 500;
 }
 
 .defaults-card .form-group {
   display: flex;
   flex-direction: column;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
   color: #1f2937;
 }
 
+.defaults-card .form-group label {
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
 .defaults-card select {
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid #cbd5e1;
   background: #f8fafc;
   color: #0f172a;
   font-weight: 600;
+  font-size: 14px;
 }
 
 .save-preferences-btn {
@@ -341,11 +415,13 @@ const deleteEntity = async (entity) => {
   background: #377fbd;
   color: #fff;
   border: none;
-  padding: 12px;
+  padding: 14px;
   border-radius: 10px;
   font-weight: 700;
+  font-size: 15px;
   cursor: pointer;
   transition: background 0.2s ease;
+  margin-top: 10px;
 }
 
 .save-preferences-btn:hover {
@@ -353,25 +429,26 @@ const deleteEntity = async (entity) => {
 }
 
 .financial-card {
-  padding: 20px 24px;
+  padding: 25px;
 }
 
 .card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 14px;
+  margin-bottom: 18px;
 }
 
 .add-btn {
   background-color:#10b981;
   border:none;
-  padding:0.6rem 1.2rem;
-  border-radius:0.5rem;
+  padding: 10px 18px;
+  border-radius: 8px;
   cursor:pointer;
   color:white;
   font-size: 14px;
   font-weight: 600;
+  transition: background 0.2s;
 }
 .add-btn:hover {
   background-color:#059669;
@@ -380,25 +457,34 @@ const deleteEntity = async (entity) => {
 .financial-table {
   width:100%;
   border-collapse:collapse;
-  margin-top:1rem;
 }
 .financial-table th, .financial-table td {
   text-align:left;
-  padding: 12px 10px;
+  padding: 14px 12px;
   border-bottom: 1px solid #e5e7eb;
 }
 .financial-table th {
   color:#1e3a8a;
   font-weight: 700;
   background: #f0f4f8;
+  font-size: 14px;
+}
+.financial-table td {
+  font-size: 14px;
+  color: #374151;
 }
 .icon-btn {
   background:none;
   border:none;
   cursor:pointer;
   color:#1e3a8a;
-  font-size:1rem;
+  font-size:1.1rem;
   margin-right:0.5rem;
+  padding: 4px;
+  transition: transform 0.2s;
+}
+.icon-btn:hover {
+  transform: scale(1.15);
 }
 .icon-btn.delete {
   color:#ef4444;
@@ -407,29 +493,75 @@ const deleteEntity = async (entity) => {
 .modal-backdrop {
   position: fixed;
   inset:0;
-  background: rgba(0,0,0,0.2);
+  background: rgba(0,0,0,0.3);
   display:flex;
   justify-content:center;
   align-items:center;
   z-index:1000;
 }
 .modal {
-  background:#f0f8ff;
-  padding:2rem;
-  border-radius:1rem;
-  width:400px;
+  background:#ffffff;
+  padding: 28px;
+  border-radius: 16px;
+  width: 440px;
   color:#1e3a8a;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.15);
+}
+.modal h3 {
+  margin: 0 0 20px;
+  font-size: 20px;
+}
+.modal .form-group {
+  margin-bottom: 16px;
+}
+.modal .form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e3a8a;
+}
+.modal .form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+.modal .form-group .hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
 }
 .save-btn {
   background:#3b82f6;
   color:white;
   border:none;
-  padding:0.5rem 1rem;
-  border-radius:0.5rem;
+  padding: 10px 20px;
+  border-radius: 8px;
   cursor:pointer;
-  margin-top:1rem;
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
 }
-.cancel-btn { background:#ef4444; color:white; border:none; padding:0.5rem 1rem; border-radius:0.5rem; cursor:pointer; margin-top:0.5rem;  }
+.cancel-btn { 
+  background:#ef4444; 
+  color:white; 
+  border:none; 
+  padding: 10px 20px; 
+  border-radius: 8px; 
+  cursor:pointer; 
+  font-weight: 600;
+  font-size: 14px;
+  flex: 1;
+}
 .save-btn:hover { background:#2563eb; }
 .cancel-btn:hover { background:#b91c1c; }
 
@@ -442,16 +574,10 @@ const deleteEntity = async (entity) => {
 
 .no-data-small {
   text-align: center;
-  padding: 20px;
+  padding: 30px;
   color: #666;
   font-style: italic;
   font-size: 14px;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 1rem;
 }
 
 @media (max-width: 1024px) {
@@ -460,6 +586,10 @@ const deleteEntity = async (entity) => {
   }
   .profile-fields {
     grid-template-columns: 1fr;
+  }
+  .profile-header {
+    flex-direction: column;
+    text-align: center;
   }
 }
 </style>

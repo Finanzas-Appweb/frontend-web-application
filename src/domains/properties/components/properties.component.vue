@@ -28,6 +28,7 @@ export default {
       propertyForm: {
         code: "",
         title: "",
+        description: "",
         address: "",
         district: "",
         province: "",
@@ -104,6 +105,7 @@ export default {
       this.propertyForm = {
         code: "",
         title: "",
+        description: "",
         address: "",
         district: "",
         province: "",
@@ -122,6 +124,7 @@ export default {
       this.propertyForm = {
         code: property.code,
         title: property.title,
+        description: property.description || "",
         address: property.address,
         district: property.district,
         province: property.province,
@@ -238,6 +241,7 @@ export default {
             </div>
             <p class="address">{{ property.address }}</p>
             <p class="address">{{ property.district }}, {{ property.province }}</p>
+            <p v-if="property.description" class="description">{{ property.description }}</p>
             <p class="meta">Área: {{ property.areaM2 }} m²</p>
             <p class="price">{{ getCurrencySymbol(property.currency) }} {{ property.price?.toLocaleString() }}</p>
             <p class="meta">Consultas: {{ property.consultsCount || 0 }}</p>
@@ -280,6 +284,16 @@ export default {
           <div class="form-group">
             <label>Título *</label>
             <input v-model="propertyForm.title" type="text" required />
+          </div>
+          <div class="form-group">
+            <label>Descripción</label>
+            <textarea 
+              v-model="propertyForm.description" 
+              rows="3" 
+              maxlength="1000"
+              placeholder="Descripción de la propiedad (máx. 1000 caracteres)"
+            ></textarea>
+            <small>{{ propertyForm.description?.length || 0 }} / 1000 caracteres</small>
           </div>
           <div class="form-group">
             <label>Dirección *</label>
@@ -529,15 +543,21 @@ export default {
   font-size: 14px;
 }
 
-.form-group input, .form-group select {
+.form-group input, .form-group select, .form-group textarea {
   padding: 12px;
   border: 2px solid #e0e0e0;
   border-radius: 8px;
   font-size: 15px;
   transition: 0.2s;
+  font-family: inherit;
 }
 
-.form-group input:focus, .form-group select:focus {
+.form-group textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
   border-color: #377fbd;
   outline: none;
 }
@@ -666,6 +686,17 @@ export default {
   margin: 0;
   color: #4b5563;
   font-size: 14px;
+}
+
+.description {
+  margin: 6px 0;
+  color: #6b7280;
+  font-size: 13px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .meta {

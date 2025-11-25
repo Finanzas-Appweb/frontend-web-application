@@ -14,8 +14,12 @@ export class SimulationsAssembler {
             clientName: resource.clientName,
             propertyId: resource.propertyId,
             propertyTitle: resource.propertyTitle,
-            bankId: resource.bankId,
-            bankName: resource.bankName,
+            bank: resource.bank ? {
+                id: resource.bank.id,
+                name: resource.bank.name,
+                annualRateTea: resource.bank.annualRateTea,
+                annualRateTna: resource.bank.annualRateTna
+            } : null,
             principal: resource.principal,
             currency: resource.currency,
             rateType: resource.rateType,
@@ -46,14 +50,14 @@ export class SimulationsAssembler {
     static toResourceFromEntity(simulation) {
         const resource = {
             clientId: simulation.clientId,
-            propertyId: simulation.propertyId,
-            bankId: simulation.bankId,
+            propertyId: simulation.propertyId || null,
+            bankId: simulation.bankId || null, // Optional - backend uses bank rates if provided
             principal: simulation.principal,
             currency: simulation.currency,
             rateType: simulation.rateType,
-            tea: simulation.tea,
-            tna: simulation.tna,
-            capitalizationPerYear: simulation.capitalizationPerYear,
+            tea: simulation.bankId ? null : simulation.tea, // Only send if no bank selected
+            tna: simulation.bankId ? null : simulation.tna, // Only send if no bank selected
+            capitalizationPerYear: simulation.bankId ? null : simulation.capitalizationPerYear,
             termMonths: simulation.termMonths,
             graceType: simulation.graceType,
             graceMonths: simulation.graceMonths,
