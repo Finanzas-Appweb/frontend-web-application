@@ -36,8 +36,8 @@ export default {
         startDate: new Date().toISOString().split('T')[0],
         applyMiViviendaBonus: false,
         bonusAmount: 0,
-        lifeInsuranceRateMonthly: 0.028, // 0.028% aprox
-        riskInsuranceRateAnnual: 0.025, // 0.025% aprox
+        lifeInsuranceRateMonthly: 0.0003, // 0.03% mensual (backend espera 0-0.01)
+        riskInsuranceRateAnnual: 0.0003, // 0.03% anual (backend espera 0-0.01)
         feesMonthly: 0
       },
       
@@ -309,10 +309,17 @@ export default {
           <div v-if="selectedBank" class="bank-info-card">
             <h4>{{ selectedBank.name }}</h4>
             <div class="bank-rates">
-              <span><strong>TEA:</strong> {{ formatRate(selectedBank.annualRateTea) }}</span>
-              <span><strong>TNA:</strong> {{ formatRate(selectedBank.annualRateTna) }}</span>
+              <span :class="{ 'rate-active': simulationForm.rateType === 1 }">
+                <strong>TEA:</strong> {{ formatRate(selectedBank.annualRateTea) }}
+              </span>
+              <span :class="{ 'rate-active': simulationForm.rateType === 2 }">
+                <strong>TNA:</strong> {{ formatRate(selectedBank.annualRateTna) }}
+              </span>
             </div>
-            <small class="hint">Las tasas se aplicarán automáticamente del banco</small>
+            <small class="hint selected-rate">
+              ✓ Usando: {{ simulationForm.rateType === 1 ? 'TEA' : 'TNA' }} 
+              {{ formatRate(simulationForm.rateType === 1 ? selectedBank.annualRateTea : selectedBank.annualRateTna) }}
+            </small>
           </div>
 
           <div class="input-group">
@@ -330,11 +337,11 @@ export default {
 
           <div class="input-group">
             <label>Tipo de Tasa *</label>
-            <select v-model.number="simulationForm.rateType" :disabled="useBankRates">
+            <select v-model.number="simulationForm.rateType">
               <option :value="1">TEA (Tasa Efectiva Anual)</option>
               <option :value="2">TNA (Tasa Nominal Anual)</option>
             </select>
-            <small v-if="useBankRates" class="hint">Se usará según selección con tasa del banco</small>
+            <small v-if="useBankRates" class="hint">Se usará {{ simulationForm.rateType === 1 ? 'TEA' : 'TNA' }} del banco seleccionado</small>
           </div>
 
           <div class="input-group" v-if="!useBankRates">
@@ -403,12 +410,14 @@ export default {
 
           <div class="input-group">
             <label>Seguro Desgravamen (% mensual)</label>
-            <input v-model.number="simulationForm.lifeInsuranceRateMonthly" type="number" step="0.001" />
+            <input v-model.number="simulationForm.lifeInsuranceRateMonthly" type="number" step="0.0001" min="0" max="0.01" placeholder="Ej: 0.0003 para 0.03%" />
+            <small class="hint">Valor entre 0 y 0.01 (0-1%). Ej: 0.0003 = 0.03%</small>
           </div>
 
           <div class="input-group">
             <label>Seguro Inmueble (% anual)</label>
-            <input v-model.number="simulationForm.riskInsuranceRateAnnual" type="number" step="0.001" />
+            <input v-model.number="simulationForm.riskInsuranceRateAnnual" type="number" step="0.0001" min="0" max="0.01" placeholder="Ej: 0.0003 para 0.03%" />
+            <small class="hint">Valor entre 0 y 0.01 (0-1%). Ej: 0.0003 = 0.03%</small>
           </div>
 
           <div class="input-group">
@@ -644,10 +653,28 @@ export default {
 .bank-info-card .bank-rates span {
   font-size: 14px;
   color: #334155;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.bank-info-card .bank-rates span.rate-active {
+  background: #0284c7;
+  color: white;
+}
+
+.bank-info-card .bank-rates span.rate-active strong {
+  color: white;
 }
 
 .bank-info-card .bank-rates strong {
   color: #0284c7;
+}
+
+.bank-info-card .selected-rate {
+  color: #059669;
+  font-weight: 600;
+  font-style: normal;
 }
 
 .error-text {

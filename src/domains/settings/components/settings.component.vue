@@ -24,6 +24,7 @@ const isEditingEntity = ref(false)
 const entityForm = reactive({ 
   id: null,
   name: "", 
+  description: "",
   annualRateTea: 0,
   annualRateTna: 0,
   effectiveFrom: ""
@@ -78,6 +79,7 @@ const openAddEntity = () => {
   isEditingEntity.value = false
   entityForm.id = null
   entityForm.name = ""
+  entityForm.description = ""
   entityForm.annualRateTea = 0
   entityForm.annualRateTna = 0
   entityForm.effectiveFrom = new Date().toISOString().split('T')[0]
@@ -88,6 +90,7 @@ const openEditEntity = (entity) => {
   isEditingEntity.value = true
   entityForm.id = entity.id
   entityForm.name = entity.name
+  entityForm.description = entity.description || ""
   entityForm.annualRateTea = entity.annualRateTea
   entityForm.annualRateTna = entity.annualRateTna || 0
   entityForm.effectiveFrom = entity.effectiveFrom ? entity.effectiveFrom.split('T')[0] : ""
@@ -99,6 +102,7 @@ const saveEntity = async () => {
     if (isEditingEntity.value) {
       await BanksAssembler.updateBank(entityForm.id, {
         name: entityForm.name,
+        description: entityForm.description,
         annualRateTea: entityForm.annualRateTea,
         annualRateTna: entityForm.annualRateTna,
         effectiveFrom: entityForm.effectiveFrom
@@ -107,6 +111,7 @@ const saveEntity = async () => {
     } else {
       await BanksAssembler.createBank({
         name: entityForm.name,
+        description: entityForm.description,
         annualRateTea: entityForm.annualRateTea,
         annualRateTna: entityForm.annualRateTna,
         effectiveFrom: entityForm.effectiveFrom
@@ -252,6 +257,10 @@ const formatRate = (rate) => {
           <div class="form-group">
             <label>Nombre de la Entidad:</label>
             <input v-model="entityForm.name" required />
+          </div>
+          <div class="form-group">
+            <label>Descripción:</label>
+            <textarea v-model="entityForm.description" rows="2" placeholder="Descripción de la entidad (opcional)"></textarea>
           </div>
           <div class="form-group">
             <label>TEA (Tasa Efectiva Anual %):</label>
@@ -521,13 +530,18 @@ const formatRate = (rate) => {
   font-size: 14px;
   color: #1e3a8a;
 }
-.modal .form-group input {
+.modal .form-group input, .modal .form-group textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 14px;
   box-sizing: border-box;
+  font-family: inherit;
+}
+.modal .form-group textarea {
+  resize: vertical;
+  min-height: 60px;
 }
 .modal .form-group .hint {
   display: block;

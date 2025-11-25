@@ -11,6 +11,7 @@ export class BanksAssembler {
         return new Bank({
             id: resource.id,
             name: resource.name,
+            description: resource.description || "",
             annualRateTea: resource.annualRateTea,
             annualRateTna: resource.annualRateTna,
             effectiveFrom: resource.effectiveFrom,
@@ -21,6 +22,7 @@ export class BanksAssembler {
     static toResourceFromEntity(bank) {
         return {
             name: bank.name,
+            description: bank.description || "",
             annualRateTea: bank.annualRateTea,
             annualRateTna: bank.annualRateTna,
             effectiveFrom: bank.effectiveFrom
