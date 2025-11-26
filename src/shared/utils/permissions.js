@@ -15,6 +15,19 @@ export const ROLE_NAMES = {
     3: 'User'
 };
 
+// Mapeo de nombres de rol a números (para cuando el backend devuelve strings)
+const ROLE_STRING_MAP = {
+    'Admin': 1,
+    'admin': 1,
+    'ADMIN': 1,
+    'Agent': 2,
+    'agent': 2,
+    'AGENT': 2,
+    'User': 3,
+    'user': 3,
+    'USER': 3
+};
+
 /**
  * Obtiene el usuario actual del localStorage
  */
@@ -31,11 +44,31 @@ export const isAuthenticated = () => {
 };
 
 /**
- * Obtiene el rol del usuario actual
+ * Obtiene el rol del usuario actual (normalizado a número)
  */
 export const getUserRole = () => {
     const user = getCurrentUser();
-    return user?.role || null;
+    if (!user) return null;
+    
+    const role = user.role;
+    
+    // Si el rol es un número, devolverlo directamente
+    if (typeof role === 'number') {
+        return role;
+    }
+    
+    // Si el rol es un string, intentar convertirlo
+    if (typeof role === 'string') {
+        // Primero intentar parsear como número
+        const parsed = parseInt(role, 10);
+        if (!isNaN(parsed)) {
+            return parsed;
+        }
+        // Luego intentar mapear por nombre
+        return ROLE_STRING_MAP[role] || null;
+    }
+    
+    return null;
 };
 
 /**
