@@ -398,8 +398,48 @@ export default {
 
     editFromDetail() {
       if (this.selectedProperty) {
+        const fullProperty = this.selectedProperty;
         this.closeDetailModal();
-        this.openEditModal(this.selectedProperty);
+        
+        // Usar los datos ya cargados directamente sin llamar al backend de nuevo
+        this.isEditing = true;
+        this.editingPropertyId = fullProperty.id;
+        
+        this.propertyForm = {
+          code: fullProperty.code || "",
+          title: fullProperty.title || "",
+          description: fullProperty.description || "",
+          address: fullProperty.address || "",
+          district: fullProperty.district || "",
+          province: fullProperty.province || "",
+          type: fullProperty.type || 1,
+          areaM2: fullProperty.areaM2 || 0,
+          price: fullProperty.price || 0,
+          currency: fullProperty.currency || 1,
+          imagesUrl: ""
+        };
+        
+        // Cargar imágenes existentes
+        this.uploadedImages = [];
+        if (fullProperty.images && fullProperty.images.length > 0) {
+          this.uploadedImages = fullProperty.images.map(img => ({
+            url: img.url || img,
+            existing: true
+          }));
+        } else if (fullProperty.imagesUrl && fullProperty.imagesUrl.length > 0) {
+          this.uploadedImages = fullProperty.imagesUrl.map(url => ({
+            url: url,
+            existing: true
+          }));
+        } else if (fullProperty.thumbnailUrl) {
+          this.uploadedImages = [{
+            url: fullProperty.thumbnailUrl,
+            existing: true
+          }];
+        }
+        
+        this.uploadProgress = {};
+        this.showModal = true;
       }
     },
 
@@ -483,9 +523,8 @@ export default {
               </div>
             </div>
             <p class="address">{{ property.address }}</p>
-            <p class="address">{{ property.district }}, {{ property.province }}</p>
+            <p class="address">{{ property.district }}</p>
             <p v-if="property.description" class="description">{{ property.description }}</p>
-            <p class="meta">Área: {{ property.areaM2 }} m²</p>
             <p class="price">{{ getCurrencySymbol(property.currency) }} {{ property.price?.toLocaleString() }}</p>
             <p class="meta">Consultas: {{ property.consultsCount || 0 }}</p>
           </div>
