@@ -45,7 +45,12 @@ export default {
       simulations: [],
       loading: false,
       loadingHistory: true,
-      validationErrors: []
+      validationErrors: [],
+      
+      // Modal de confirmación para eliminar
+      showDeleteModal: false,
+      simulationToDelete: null,
+      deleting: false
     };
   },
   async mounted() {
@@ -242,7 +247,7 @@ export default {
     },
 
     getGraceTypeName(type) {
-      const types = { 0: 'Sin Gracia', 1: 'Total', 2: 'Parcial' };
+      const types = { 0: 'Sin Gracia', 1: 'Parcial', 2: 'Total' };
       return types[type] || '-';
     },
 
@@ -257,6 +262,51 @@ export default {
         return sim.bankName;
       }
       return 'Tasa manual';
+    },
+
+    // Mostrar modal de confirmación para eliminar
+    confirmDeleteSimulation(simulation) {
+      this.simulationToDelete = simulation;
+      this.showDeleteModal = true;
+    },
+
+    // Cancelar eliminación
+    cancelDelete() {
+      this.showDeleteModal = false;
+      this.simulationToDelete = null;
+    },
+
+    // Confirmar y ejecutar eliminación
+    async executeDeleteSimulation() {
+      if (!this.simulationToDelete) return;
+
+      try {
+        this.deleting = true;
+        await SimulationsAssembler.deleteSimulation(this.simulationToDelete.id);
+        
+        // Cerrar modal
+        this.showDeleteModal = false;
+        this.simulationToDelete = null;
+        
+        // Si el resultado actual era esta simulación, limpiar
+        if (this.simulationResult?.id === this.simulationToDelete?.id) {
+          this.simulationResult = null;
+        }
+        
+        alert("Simulación eliminada correctamente");
+        
+        // Recargar historial
+        await this.loadSimulations();
+      } catch (error) {
+        console.error("Error al eliminar simulación:", error);
+        if (error.response?.data?.title) {
+          alert(`Error: ${error.response.data.title}`);
+        } else {
+          alert("Error al eliminar la simulación");
+        }
+      } finally {
+        this.deleting = false;
+      }
     }
   },
 };
@@ -379,8 +429,8 @@ export default {
             <label>Tipo de Gracia</label>
             <select v-model.number="simulationForm.graceType">
               <option :value="0">Sin Gracia</option>
-              <option :value="1">Total</option>
-              <option :value="2">Parcial</option>
+              <option :value="1">Parcial</option>
+              <option :value="2">Total</option>
             </select>
           </div>
 
@@ -516,6 +566,7 @@ export default {
           <th>Plazo</th>
           <th>Tasa</th>
           <th>Cuota Mensual</th>
+          <th>Acciones</th>
         </tr>
         </thead>
         <tbody>
@@ -528,10 +579,36 @@ export default {
           <td>{{ sim.termMonths }} meses</td>
           <td>{{ getRateTypeName(sim.rateType) }}: {{ formatRate(sim.rateType === 1 ? sim.tea : sim.tna) }}</td>
           <td class="highlight">{{ getCurrencySymbol(sim.currency) }} {{ sim.monthlyPayment?.toFixed(2) }}</td>
+          <td class="actions-cell">
+            <button class="btn-delete" @click="confirmDeleteSimulation(sim)" title="Eliminar simulación">
+              🗑️
+            </button>
+          </td>
         </tr>
         </tbody>
       </table>
       <p v-else class="no-data">No hay simulaciones registradas</p>
+    </div>
+
+    <!-- Modal de Confirmación para Eliminar Simulación -->
+    <div v-if="showDeleteModal" class="modal-backdrop" @click.self="cancelDelete">
+      <div class="modal-content delete-modal">
+        <h2>⚠️ Confirmar Eliminación</h2>
+        <p>¿Estás seguro de que deseas eliminar esta simulación?</p>
+        <div v-if="simulationToDelete" class="simulation-info">
+          <p><strong>Cliente:</strong> {{ simulationToDelete.clientName }}</p>
+          <p><strong>Propiedad:</strong> {{ simulationToDelete.propertyTitle }}</p>
+          <p><strong>Monto:</strong> {{ getCurrencySymbol(simulationToDelete.currency) }} {{ simulationToDelete.principal?.toLocaleString() }}</p>
+          <p><strong>Cuota:</strong> {{ getCurrencySymbol(simulationToDelete.currency) }} {{ simulationToDelete.monthlyPayment?.toFixed(2) }}</p>
+        </div>
+        <p class="warning-text">Esta acción no se puede deshacer.</p>
+        <div class="modal-actions">
+          <button @click="executeDeleteSimulation" class="confirm-delete-btn" :disabled="deleting">
+            {{ deleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+          </button>
+          <button @click="cancelDelete" class="cancel-btn" :disabled="deleting">Cancelar</button>
+        </div>
+      </div>
     </div>
   </div>
   <footer-content></footer-content>
@@ -836,5 +913,131 @@ export default {
   .simulator-content { flex-direction: column; }
   .result-section { width: 100%; }
   .form-grid { grid-template-columns: 1fr; }
+}
+
+/* Estilos para acciones en historial */
+.actions-cell {
+  text-align: center;
+}
+
+.btn-delete {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover {
+  background: #fee2e2;
+  transform: scale(1.1);
+}
+
+/* Modal styles */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.2);
+}
+
+.delete-modal h2 {
+  color: #dc2626;
+  margin-bottom: 15px;
+  font-size: 22px;
+}
+
+.delete-modal > p {
+  color: #475569;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.simulation-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.simulation-info p {
+  margin: 5px 0;
+  color: #334155;
+  font-size: 14px;
+}
+
+.simulation-info strong {
+  color: #1e293b;
+}
+
+.warning-text {
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.confirm-delete-btn {
+  flex: 1;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.confirm-delete-btn:disabled {
+  background-color: #fca5a5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  flex: 1;
+  background-color: #e5e7eb;
+  color: #475569;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: #cbd5e1;
+}
+
+.cancel-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 </style>

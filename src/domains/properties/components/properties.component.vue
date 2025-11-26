@@ -1,6 +1,7 @@
 <script>
 import { PropertiesAssembler } from "../services/properties.assembler.js";
 import { usePermissions } from "../../../shared/composables/usePermissions.js";
+import { uploadMultipleImages, validateImageFile, getThumbnailUrl } from "../../../shared/services/cloudinary.service.js";
 import NavBar from "../../../shared/presentation/components/nav-bar.vue";
 import FooterContent from "../../../shared/presentation/components/footer-content.vue";
 
@@ -39,6 +40,13 @@ export default {
         imagesUrl: ""
       },
       editingPropertyId: null,
+      
+      // Estado para subida de imágenes
+      uploadedImages: [],
+      uploadingImages: false,
+      uploadProgress: {},
+      dragOver: false,
+      maxImages: 5
     };
   },
   async mounted() {
@@ -115,6 +123,8 @@ export default {
         currency: 1,
         imagesUrl: ""
       };
+      this.uploadedImages = [];
+      this.uploadProgress = {};
       this.showModal = true;
     },
 
@@ -132,8 +142,22 @@ export default {
         areaM2: property.areaM2,
         price: property.price,
         currency: property.currency,
-        imagesUrl: Array.isArray(property.imagesUrl) ? property.imagesUrl.join(', ') : (property.images?.map(img => img.url).join(', ') || "")
+        imagesUrl: ""
       };
+      // Cargar imágenes existentes
+      this.uploadedImages = [];
+      if (property.images && property.images.length > 0) {
+        this.uploadedImages = property.images.map(img => ({
+          url: img.url,
+          existing: true
+        }));
+      } else if (property.imagesUrl && property.imagesUrl.length > 0) {
+        this.uploadedImages = property.imagesUrl.map(url => ({
+          url: url,
+          existing: true
+        }));
+      }
+      this.uploadProgress = {};
       this.showModal = true;
     },
 
@@ -141,10 +165,7 @@ export default {
       try {
         const payload = {
           ...this.propertyForm,
-          imagesUrl: (this.propertyForm.imagesUrl || "")
-              .split(",")
-              .map((u) => u.trim())
-              .filter((u) => !!u)
+          imagesUrl: this.uploadedImages.map(img => img.url).filter(u => !!u)
         };
         if (this.isEditing) {
           await PropertiesAssembler.updateProperty(this.editingPropertyId, payload);
@@ -187,6 +208,93 @@ export default {
 
     closeModal() {
       this.showModal = false;
+      this.uploadedImages = [];
+      this.uploadProgress = {};
+    },
+
+    // Métodos para subida de imágenes con Cloudinary
+    onDragOver(event) {
+      event.preventDefault();
+      this.dragOver = true;
+    },
+
+    onDragLeave() {
+      this.dragOver = false;
+    },
+
+    onDrop(event) {
+      event.preventDefault();
+      this.dragOver = false;
+      const files = event.dataTransfer.files;
+      this.handleFiles(files);
+    },
+
+    onFileSelect(event) {
+      const files = event.target.files;
+      this.handleFiles(files);
+      // Reset input para permitir seleccionar el mismo archivo
+      event.target.value = '';
+    },
+
+    async handleFiles(files) {
+      if (!files || files.length === 0) return;
+
+      const remainingSlots = this.maxImages - this.uploadedImages.length;
+      if (remainingSlots <= 0) {
+        alert(`Ya tienes ${this.maxImages} imágenes. Elimina alguna para agregar más.`);
+        return;
+      }
+
+      const filesToUpload = Array.from(files).slice(0, remainingSlots);
+
+      // Validar archivos
+      for (const file of filesToUpload) {
+        const validation = validateImageFile(file);
+        if (!validation.valid) {
+          alert(`${file.name}: ${validation.error}`);
+          return;
+        }
+      }
+
+      try {
+        this.uploadingImages = true;
+        
+        const result = await uploadMultipleImages(filesToUpload, {
+          maxImages: this.maxImages,
+          onFileProgress: (index, progress) => {
+            this.uploadProgress[index] = progress;
+          },
+          onFileComplete: (index, result) => {
+            if (result.success) {
+              this.uploadedImages.push({
+                url: result.result.url,
+                publicId: result.result.publicId,
+                existing: false
+              });
+            }
+          }
+        });
+
+        if (result.errors.length > 0) {
+          const errorMessages = result.errors.map(e => `${e.fileName}: ${e.error}`).join('\n');
+          alert(`Algunas imágenes no se pudieron subir:\n${errorMessages}`);
+        }
+
+      } catch (error) {
+        console.error("Error subiendo imágenes:", error);
+        alert(error.message || "Error al subir imágenes");
+      } finally {
+        this.uploadingImages = false;
+        this.uploadProgress = {};
+      }
+    },
+
+    removeImage(index) {
+      this.uploadedImages.splice(index, 1);
+    },
+
+    getThumbnail(url) {
+      return getThumbnailUrl(url, 150, 100);
     }
   },
 };
@@ -336,9 +444,51 @@ export default {
             </div>
           </div>
           <div class="form-group">
-            <label>URL de Imagen(es)</label>
-            <input v-model="propertyForm.imagesUrl" type="text" placeholder="URL separadas por comas" />
-            <small>Ingresa una o más URLs de imágenes separadas por comas</small>
+            <label>Imágenes (máx. {{ maxImages }})</label>
+            
+            <!-- Área de drop / selección -->
+            <div 
+              class="image-upload-area"
+              :class="{ 'drag-over': dragOver, 'disabled': uploadedImages.length >= maxImages || uploadingImages }"
+              @dragover="onDragOver"
+              @dragleave="onDragLeave"
+              @drop="onDrop"
+              @click="$refs.fileInput.click()"
+            >
+              <input 
+                ref="fileInput"
+                type="file" 
+                accept="image/jpeg,image/png,image/gif,image/webp"
+                multiple
+                :disabled="uploadedImages.length >= maxImages || uploadingImages"
+                @change="onFileSelect"
+                style="display: none;"
+              />
+              <div v-if="uploadingImages" class="upload-status">
+                <span class="spinner"></span>
+                <span>Subiendo imágenes...</span>
+              </div>
+              <div v-else-if="uploadedImages.length >= maxImages" class="upload-status">
+                <span>Límite de {{ maxImages }} imágenes alcanzado</span>
+              </div>
+              <div v-else class="upload-prompt">
+                <span class="upload-icon">📷</span>
+                <span>Arrastra imágenes aquí o haz clic para seleccionar</span>
+                <small>JPEG, PNG, GIF, WebP (máx. 10MB cada una)</small>
+              </div>
+            </div>
+
+            <!-- Vista previa de imágenes -->
+            <div v-if="uploadedImages.length > 0" class="images-preview">
+              <div v-for="(img, index) in uploadedImages" :key="index" class="preview-item">
+                <img :src="getThumbnail(img.url)" :alt="'Imagen ' + (index + 1)" />
+                <button type="button" class="remove-image-btn" @click="removeImage(index)" title="Eliminar imagen">
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <small>{{ uploadedImages.length }} de {{ maxImages }} imágenes</small>
           </div>
           <div class="modal-actions">
             <button type="submit" class="save-btn">{{ isEditing ? 'Actualizar' : 'Crear' }}</button>
@@ -717,5 +867,115 @@ export default {
   margin-top: 30px;
   color: #c53030;
   font-weight: 600;
+}
+
+/* Estilos para subida de imágenes */
+.image-upload-area {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 30px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: #f8fafc;
+}
+
+.image-upload-area:hover:not(.disabled) {
+  border-color: #377fbd;
+  background: #f0f9ff;
+}
+
+.image-upload-area.drag-over {
+  border-color: #377fbd;
+  background: #e0f2fe;
+  transform: scale(1.01);
+}
+
+.image-upload-area.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.upload-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #64748b;
+}
+
+.upload-prompt .upload-icon {
+  font-size: 32px;
+}
+
+.upload-prompt small {
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.upload-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: #377fbd;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #e0e0e0;
+  border-top-color: #377fbd;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.images-preview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.preview-item {
+  position: relative;
+  width: 100px;
+  height: 70px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.remove-image-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  background: rgba(220, 38, 38, 0.9);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.remove-image-btn:hover {
+  background: #dc2626;
+  transform: scale(1.1);
 }
 </style>

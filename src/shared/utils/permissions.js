@@ -143,8 +143,8 @@ export const canViewProperties = () => {
  * Reglas de permisos para bancos/entidades financieras
  */
 export const canManageBanks = () => {
-    // Admin y Agent pueden gestionar bancos
-    return isAdminOrAgent();
+    // Solo Admin puede gestionar bancos (POST, PUT, DELETE)
+    return isAdmin();
 };
 
 /**

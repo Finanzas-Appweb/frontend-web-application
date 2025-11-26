@@ -48,6 +48,9 @@ export class SimulationsAssembler {
     }
 
     static toResourceFromEntity(simulation) {
+        // Determinar si es TNA (rateType === 2)
+        const isTNA = simulation.rateType === 2;
+        
         const resource = {
             clientId: simulation.clientId,
             propertyId: simulation.propertyId || null,
@@ -57,7 +60,8 @@ export class SimulationsAssembler {
             rateType: simulation.rateType,
             tea: simulation.bankId ? null : simulation.tea, // Only send if no bank selected
             tna: simulation.bankId ? null : simulation.tna, // Only send if no bank selected
-            capitalizationPerYear: simulation.bankId ? null : simulation.capitalizationPerYear,
+            // TNA siempre requiere capitalizationPerYear = 12 (incluso con banco)
+            capitalizationPerYear: isTNA ? 12 : (simulation.bankId ? null : simulation.capitalizationPerYear),
             termMonths: simulation.termMonths,
             graceType: simulation.graceType,
             graceMonths: simulation.graceMonths,
