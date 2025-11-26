@@ -108,6 +108,25 @@ export default {
       return currency === 1 ? 'S/' : '$';
     },
 
+    getPropertyImage(property) {
+      // Prioridad: thumbnailUrl del backend > primera imagen del array > primera URL
+      if (property.thumbnailUrl) {
+        return property.thumbnailUrl;
+      }
+      if (property.images && property.images.length > 0 && property.images[0].url) {
+        return property.images[0].url;
+      }
+      if (property.imagesUrl && property.imagesUrl.length > 0) {
+        return property.imagesUrl[0];
+      }
+      return null;
+    },
+
+    onImageError(event) {
+      // Si la imagen falla, ocultar el elemento
+      event.target.style.display = 'none';
+    },
+
     openAddModal() {
       this.isEditing = false;
       this.propertyForm = {
@@ -334,7 +353,16 @@ export default {
       <div class="cards-grid">
         <div v-for="property in properties" :key="property.id" class="property-card">
           <div class="image-wrapper">
-            <img :src="(property.images?.[0]?.url) || property.imagesUrl?.[0] || 'https://via.placeholder.com/300x180?text=Imagen+de+propiedad'" alt="Imagen de propiedad">
+            <img 
+              v-if="getPropertyImage(property)" 
+              :src="getPropertyImage(property)" 
+              alt="Imagen de propiedad"
+              @error="onImageError"
+            />
+            <div v-else class="no-image-placeholder">
+              <span>📷</span>
+              <span>Sin imagen</span>
+            </div>
           </div>
           <div class="card-body">
             <div class="card-header">
@@ -799,6 +827,26 @@ export default {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.no-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #e5f2fb 0%, #d1e8f8 100%);
+  color: #64748b;
+}
+
+.no-image-placeholder span:first-child {
+  font-size: 32px;
+  margin-bottom: 5px;
+}
+
+.no-image-placeholder span:last-child {
+  font-size: 12px;
 }
 
 .card-body {

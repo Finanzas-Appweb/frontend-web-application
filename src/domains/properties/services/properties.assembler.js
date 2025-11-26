@@ -21,6 +21,7 @@ export class PropertiesAssembler {
             price: resource.price,
             currency: resource.currency,
             images: resource.images || [],
+            thumbnailUrl: resource.thumbnailUrl || null, // URL de thumbnail del backend
             createdBy: resource.createdBy,
             createdAtUtc: resource.createdAtUtc,
             consultsCount: resource.consultsCount
