@@ -575,4 +575,133 @@ export default {
   color: #c53030;
   font-weight: 600;
 }
+
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Tablets */
+@media (max-width: 1024px) {
+  .clients-container {
+    padding: 25px 30px;
+  }
+
+  .header-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .cards-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .clients-container {
+    padding: 20px 15px;
+  }
+
+  .header-section h1 {
+    font-size: 22px;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .search-btn, .add-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .cards-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .client-card {
+    padding: 15px;
+  }
+
+  .client-card h3 {
+    font-size: 16px;
+  }
+
+  /* Modal responsive */
+  .modal-content {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-content h2 {
+    font-size: 20px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* Pagination */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .pagination button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .clients-container {
+    padding: 15px 10px;
+  }
+
+  .header-section h1 {
+    font-size: 20px;
+  }
+
+  .client-card {
+    padding: 12px;
+  }
+
+  .client-card h3 {
+    font-size: 15px;
+  }
+
+  .client-card p {
+    font-size: 13px;
+  }
+}
 </style>

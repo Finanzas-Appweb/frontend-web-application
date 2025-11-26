@@ -370,7 +370,7 @@ export default {
   <div class="simulator-container">
     <div class="header-section">
       <h1>Simulador Hipotecario</h1>
-      <p>Crea simulaciones de crédito conectadas al backend</p>
+      <p>Calcula y guarda tus simulaciones de crédito hipotecario</p>
     </div>
 
     <div class="simulator-content">
@@ -508,7 +508,7 @@ export default {
             <label>Monto Bono MiVivienda *</label>
             <input v-model.number="simulationForm.bonusAmount" type="number" step="0.01" />
             <small>Debe ser mayor a 0 y menor al monto principal</small>
-            <small v-if="miViviendaInvalid" class="error-text">Monto de bono inválido según las reglas del backend</small>
+            <small v-if="miViviendaInvalid" class="error-text">El monto del bono debe ser mayor a 0 y menor al monto principal</small>
           </div>
 
           <div class="input-group">
@@ -1482,5 +1482,203 @@ export default {
 .btn-delete-detail:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
+}
+
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Tablets */
+@media (max-width: 1024px) {
+  .simulator-container {
+    padding: 25px 30px;
+  }
+
+  .simulator-content {
+    flex-direction: column;
+  }
+
+  .form-section, .result-section {
+    width: 100%;
+  }
+
+  .result-section {
+    min-width: unset;
+  }
+
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .bank-info-card {
+    grid-column: span 2;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .simulator-container {
+    padding: 20px 15px;
+  }
+
+  .header-section h1 {
+    font-size: 22px;
+  }
+
+  .header-section p {
+    font-size: 14px;
+  }
+
+  .form-section, .result-section {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .form-section h2, .result-section h2 {
+    font-size: 18px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .bank-info-card {
+    grid-column: span 1;
+  }
+
+  .bank-info-card .bank-rates {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .simulate-btn {
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  /* Result section mobile */
+  .main-result {
+    padding: 20px;
+  }
+
+  .main-result .amount {
+    font-size: 28px;
+  }
+
+  .result-details {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .result-details .detail-item {
+    padding: 12px;
+  }
+
+  /* History table mobile */
+  .history-section h2 {
+    font-size: 18px;
+  }
+
+  .history-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .history-table th, .history-table td {
+    padding: 8px 10px;
+  }
+
+  .actions-cell {
+    display: flex;
+    gap: 5px;
+  }
+
+  /* Modal responsive */
+  .modal-content {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .detail-modal {
+    max-width: 95%;
+  }
+
+  .detail-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .results-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .result-card .result-value {
+    font-size: 14px;
+  }
+
+  .amortization-table-container {
+    max-height: 250px;
+  }
+
+  .amortization-table {
+    font-size: 11px;
+  }
+
+  .amortization-table th, .amortization-table td {
+    padding: 6px 4px;
+  }
+
+  .detail-actions {
+    flex-direction: column;
+  }
+
+  .btn-excel, .btn-delete-detail {
+    padding: 12px;
+    font-size: 14px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .simulator-container {
+    padding: 15px 10px;
+  }
+
+  .header-section h1 {
+    font-size: 20px;
+  }
+
+  .form-section, .result-section {
+    padding: 15px;
+  }
+
+  .input-group label {
+    font-size: 12px;
+  }
+
+  .input-group input, .input-group select {
+    padding: 10px;
+    font-size: 14px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .results-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .delete-modal h2 {
+    font-size: 18px;
+  }
+
+  .modal-actions, .delete-modal-actions {
+    flex-direction: column;
+  }
 }
 </style>

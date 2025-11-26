@@ -1087,6 +1087,7 @@ export default {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1528,5 +1529,183 @@ export default {
 .cancel-btn:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Tablets */
+@media (max-width: 1024px) {
+  .properties-container {
+    padding: 25px 30px;
+  }
+
+  .header-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .properties-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .properties-container {
+    padding: 20px 15px;
+  }
+
+  .header-section h1 {
+    font-size: 22px;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .search-btn, .add-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .properties-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .property-card {
+    max-width: 100%;
+  }
+
+  .property-image {
+    height: 180px;
+  }
+
+  .property-info {
+    padding: 15px;
+  }
+
+  /* Modal responsive */
+  .modal-content {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-content h2 {
+    font-size: 20px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* Detail modal */
+  .detail-modal {
+    max-width: 95%;
+    padding: 20px;
+  }
+
+  .property-gallery {
+    height: 200px;
+  }
+
+  .gallery-thumbnails {
+    gap: 8px;
+  }
+
+  .gallery-thumbnails img {
+    width: 50px;
+    height: 50px;
+  }
+
+  .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .info-item {
+    padding: 10px;
+  }
+
+  .detail-actions {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
+
+  /* Pagination */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .pagination button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .properties-container {
+    padding: 15px 10px;
+  }
+
+  .header-section h1 {
+    font-size: 20px;
+  }
+
+  .property-title {
+    font-size: 15px;
+  }
+
+  .property-price {
+    font-size: 16px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .delete-confirm-modal {
+    padding: 20px;
+  }
+
+  .delete-modal-actions {
+    flex-direction: column;
+  }
 }
 </style>

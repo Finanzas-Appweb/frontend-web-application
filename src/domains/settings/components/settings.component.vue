@@ -606,6 +606,8 @@ const formatRate = (rate) => {
   font-size: 14px;
 }
 
+/* ===== RESPONSIVE STYLES ===== */
+
 @media (max-width: 1024px) {
   .top-section {
     grid-template-columns: 1fr;
@@ -616,6 +618,90 @@ const formatRate = (rate) => {
   .profile-header {
     flex-direction: column;
     text-align: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-container {
+    padding: 20px 15px;
+  }
+
+  .settings-container > h1 {
+    font-size: 22px;
+  }
+
+  .card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .card h2 {
+    font-size: 18px;
+  }
+
+  .entities-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .add-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .entities-table {
+    display: block;
+    overflow-x: auto;
+    font-size: 13px;
+  }
+
+  .entities-table th, .entities-table td {
+    padding: 10px 8px;
+  }
+
+  /* Modal responsive */
+  .modal-content {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .save-btn, .cancel-btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-container {
+    padding: 15px 10px;
+  }
+
+  .settings-container > h1 {
+    font-size: 20px;
+  }
+
+  .card {
+    padding: 15px;
+  }
+
+  .profile-fields .field label {
+    font-size: 12px;
+  }
+
+  .profile-fields .field span {
+    font-size: 14px;
+  }
+
+  .preferences-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

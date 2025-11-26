@@ -366,10 +366,64 @@ tr:hover {
   position: relative;
 }
 
-/* RESPONSIVE */
+/* ===== RESPONSIVE STYLES ===== */
 @media (max-width: 1024px) {
   .top-row {
     flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .reports-container {
+    padding: 20px 15px;
+  }
+
+  .reports-container > h1 {
+    font-size: 22px;
+  }
+
+  .report-card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .report-card h2 {
+    font-size: 16px;
+  }
+
+  .chart-wrapper {
+    height: 250px;
+  }
+
+  table {
+    font-size: 13px;
+  }
+
+  th, td {
+    padding: 8px 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-container {
+    padding: 15px 10px;
+  }
+
+  .reports-container > h1 {
+    font-size: 20px;
+  }
+
+  .report-card {
+    padding: 15px;
+  }
+
+  .chart-wrapper {
+    height: 200px;
+  }
+
+  th, td {
+    padding: 6px 4px;
+    font-size: 12px;
   }
 }
 
