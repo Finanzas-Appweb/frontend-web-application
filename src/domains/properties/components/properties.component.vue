@@ -51,7 +51,12 @@ export default {
       // Modal de detalle de propiedad
       showDetailModal: false,
       selectedProperty: null,
-      loadingDetail: false
+      loadingDetail: false,
+
+      // Modal de confirmación de eliminación
+      showDeleteModal: false,
+      propertyToDelete: null,
+      deleting: false
     };
   },
   async mounted() {
@@ -210,13 +215,30 @@ export default {
       }
     },
 
-    async deleteProperty(property) {
-      if (!confirm(`¿Estás seguro de eliminar la propiedad ${property.code}?`)) {
-        return;
-      }
+    // Mostrar modal de confirmación para eliminar
+    confirmDeleteProperty(property) {
+      this.propertyToDelete = property;
+      this.showDeleteModal = true;
+    },
+
+    // Cancelar eliminación
+    cancelDelete() {
+      this.showDeleteModal = false;
+      this.propertyToDelete = null;
+    },
+
+    // Confirmar y ejecutar eliminación
+    async executeDeleteProperty() {
+      if (!this.propertyToDelete) return;
+
       try {
-        await PropertiesAssembler.deleteProperty(property.id);
-        alert("Propiedad eliminada correctamente");
+        this.deleting = true;
+        await PropertiesAssembler.deleteProperty(this.propertyToDelete.id);
+        
+        // Cerrar modal
+        this.showDeleteModal = false;
+        this.propertyToDelete = null;
+        
         await this.loadProperties();
       } catch (error) {
         console.error("Error al eliminar propiedad:", error);
@@ -227,7 +249,14 @@ export default {
         } else {
           alert("Error al eliminar la propiedad");
         }
+      } finally {
+        this.deleting = false;
       }
+    },
+
+    // Mantener compatibilidad con llamadas antiguas
+    async deleteProperty(property) {
+      this.confirmDeleteProperty(property);
     },
 
     closeModal() {
@@ -660,6 +689,26 @@ export default {
               🗑️ Eliminar
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Confirmación para Eliminar Propiedad -->
+    <div v-if="showDeleteModal" class="modal-backdrop" @click.self="cancelDelete">
+      <div class="modal-content delete-confirm-modal">
+        <h2>⚠️ Confirmar Eliminación</h2>
+        <p>¿Estás seguro de que deseas eliminar esta propiedad?</p>
+        <div v-if="propertyToDelete" class="property-delete-info">
+          <p><strong>Código:</strong> {{ propertyToDelete.code }}</p>
+          <p><strong>Título:</strong> {{ propertyToDelete.title }}</p>
+          <p><strong>Precio:</strong> {{ getCurrencySymbol(propertyToDelete.currency) }} {{ propertyToDelete.price?.toLocaleString() }}</p>
+        </div>
+        <p class="warning-text">Esta acción no se puede deshacer.</p>
+        <div class="delete-modal-actions">
+          <button @click="executeDeleteProperty" class="confirm-delete-btn" :disabled="deleting">
+            {{ deleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+          </button>
+          <button @click="cancelDelete" class="cancel-btn" :disabled="deleting">Cancelar</button>
         </div>
       </div>
     </div>
@@ -1388,5 +1437,96 @@ export default {
 
 .delete-action:hover {
   background: #fecaca;
+}
+
+/* Modal de confirmación de eliminación */
+.delete-confirm-modal {
+  max-width: 450px;
+}
+
+.delete-confirm-modal h2 {
+  color: #dc2626;
+  margin-bottom: 15px;
+  font-size: 22px;
+}
+
+.delete-confirm-modal > p {
+  color: #475569;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.property-delete-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.property-delete-info p {
+  margin: 5px 0;
+  color: #334155;
+  font-size: 14px;
+}
+
+.property-delete-info strong {
+  color: #1e293b;
+}
+
+.warning-text {
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.delete-modal-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.confirm-delete-btn {
+  flex: 1;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.confirm-delete-btn:disabled {
+  background-color: #fca5a5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  flex: 1;
+  background-color: #e5e7eb;
+  color: #475569;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: #cbd5e1;
+}
+
+.cancel-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 </style>

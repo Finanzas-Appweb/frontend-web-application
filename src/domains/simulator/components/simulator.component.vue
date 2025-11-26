@@ -750,20 +750,28 @@ export default {
                 <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.monthlyPayment?.toFixed(2) }}</span>
               </div>
               <div class="result-card">
-                <span class="result-label">Total Intereses</span>
-                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.totalInterest?.toLocaleString() }}</span>
+                <span class="result-label">TEM</span>
+                <span class="result-value">{{ formatPercent(selectedSimulation.tem) }}</span>
               </div>
               <div class="result-card">
-                <span class="result-label">Total a Pagar</span>
-                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.totalPayment?.toLocaleString() }}</span>
+                <span class="result-label">TCEA</span>
+                <span class="result-value">{{ formatPercent(selectedSimulation.tcea) }}</span>
               </div>
-              <div class="result-card" v-if="selectedSimulation.lifeInsuranceRateMonthly">
-                <span class="result-label">Seguro de Vida (mensual)</span>
-                <span class="result-value">{{ formatPercent(selectedSimulation.lifeInsuranceRateMonthly) }}</span>
+              <div class="result-card">
+                <span class="result-label">TIR</span>
+                <span class="result-value">{{ formatPercent(selectedSimulation.tir) }}</span>
               </div>
-              <div class="result-card" v-if="selectedSimulation.riskInsuranceRateAnnual">
-                <span class="result-label">Seguro de Riesgo (anual)</span>
-                <span class="result-value">{{ formatPercent(selectedSimulation.riskInsuranceRateAnnual) }}</span>
+              <div class="result-card">
+                <span class="result-label">VAN</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.van?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+              </div>
+              <div class="result-card">
+                <span class="result-label">Intereses Totales</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.totalInterest?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+              </div>
+              <div class="result-card highlight">
+                <span class="result-label">Costo Total</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.totalCost?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
               </div>
             </div>
           </div>
@@ -775,26 +783,24 @@ export default {
               <table class="amortization-table">
                 <thead>
                   <tr>
-                    <th>Mes</th>
+                    <th>Período</th>
                     <th>Fecha</th>
-                    <th>Cuota</th>
-                    <th>Capital</th>
+                    <th>Saldo Inicial</th>
                     <th>Interés</th>
-                    <th>Seguro Vida</th>
-                    <th>Seguro Riesgo</th>
-                    <th>Saldo</th>
+                    <th>Amortización</th>
+                    <th>Cuota</th>
+                    <th>Saldo Final</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="row in selectedSimulation.amortizationSchedule" :key="row.month">
-                    <td>{{ row.month }}</td>
-                    <td>{{ row.date ? new Date(row.date).toLocaleDateString('es-PE') : '-' }}</td>
-                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.payment?.toFixed(2) }}</td>
-                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.principal?.toFixed(2) }}</td>
+                  <tr v-for="row in selectedSimulation.amortizationSchedule" :key="row.period">
+                    <td>{{ row.period }}</td>
+                    <td>{{ row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-PE') : '-' }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.openingBalance?.toFixed(2) }}</td>
                     <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.interest?.toFixed(2) }}</td>
-                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.lifeInsurance?.toFixed(2) }}</td>
-                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.riskInsurance?.toFixed(2) }}</td>
-                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.balance?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.principal?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.installment?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.closingBalance?.toFixed(2) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -1368,6 +1374,16 @@ export default {
 
 .result-card.primary .result-label,
 .result-card.primary .result-value {
+  color: white;
+}
+
+.result-card.highlight {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: none;
+}
+
+.result-card.highlight .result-label,
+.result-card.highlight .result-value {
   color: white;
 }
 
