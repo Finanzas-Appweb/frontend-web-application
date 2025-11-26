@@ -364,4 +364,86 @@ tr:nth-child(even) {
   color: #c53030;
   font-weight: 600;
 }
+
+/* ===== RESPONSIVE STYLES ===== */
+
+@media (max-width: 1024px) {
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .home-container {
+    padding: 1rem;
+  }
+
+  .stats-cards {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .card h3 {
+    font-size: 0.9rem;
+  }
+
+  .card p {
+    font-size: 1.5rem;
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  table {
+    font-size: 0.85rem;
+    min-width: 500px;
+  }
+
+  th, td {
+    padding: 0.5rem;
+  }
+
+  .chart-wrapper {
+    height: 220px;
+  }
+
+  .buttons-container {
+    flex-direction: column;
+  }
+
+  .btn {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .home-container {
+    padding: 0.75rem;
+  }
+
+  .card {
+    padding: 0.75rem;
+  }
+
+  .card h3 {
+    font-size: 0.8rem;
+  }
+
+  .card p {
+    font-size: 1.25rem;
+  }
+
+  .chart-wrapper {
+    height: 180px;
+  }
+
+  .chart-card h3, .table-container h3 {
+    font-size: 0.9rem;
+  }
+}
 </style>

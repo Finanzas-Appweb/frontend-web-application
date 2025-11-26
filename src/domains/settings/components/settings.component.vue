@@ -234,30 +234,32 @@ const formatRate = (rate) => {
           <h2>Entidades Financieras</h2>
           <button v-if="permissions.canManageBanks.value" class="add-btn" @click="openAddEntity">+ Añadir Entidad</button>
         </div>
-        <table v-if="financialEntities.length > 0" class="financial-table">
-          <thead>
-          <tr>
-            <th>Entidad</th>
-            <th>TEA</th>
-            <th>TNA</th>
-            <th>Vigente Desde</th>
-            <th v-if="permissions.canManageBanks.value">Acciones</th>
-          </tr>
-          </thead>
-          <tbody>
-          <tr v-for="entity in financialEntities" :key="entity.id">
-            <td>{{ entity.name }}</td>
-            <td>{{ formatRate(entity.annualRateTea) }}</td>
-            <td>{{ formatRate(entity.annualRateTna) }}</td>
-            <td>{{ entity.effectiveFrom ? new Date(entity.effectiveFrom).toLocaleDateString('es-PE') : '-' }}</td>
-            <td v-if="permissions.canManageBanks.value">
-              <button class="icon-btn" @click="openEditEntity(entity)" title="Editar">✏️</button>
-              <button class="icon-btn delete" @click="deleteEntity(entity)" title="Eliminar">🗑️</button>
-            </td>
-          </tr>
-          </tbody>
-        </table>
-        <p v-else class="no-data-small">No hay entidades financieras registradas</p>
+        <div class="table-scroll-wrapper">
+          <table v-if="financialEntities.length > 0" class="financial-table">
+            <thead>
+            <tr>
+              <th>Entidad</th>
+              <th>TEA</th>
+              <th>TNA</th>
+              <th>Vigente Desde</th>
+              <th v-if="permissions.canManageBanks.value">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="entity in financialEntities" :key="entity.id">
+              <td>{{ entity.name }}</td>
+              <td>{{ formatRate(entity.annualRateTea) }}</td>
+              <td>{{ formatRate(entity.annualRateTna) }}</td>
+              <td>{{ entity.effectiveFrom ? new Date(entity.effectiveFrom).toLocaleDateString('es-PE') : '-' }}</td>
+              <td v-if="permissions.canManageBanks.value">
+                <button class="icon-btn" @click="openEditEntity(entity)" title="Editar">✏️</button>
+                <button class="icon-btn delete" @click="deleteEntity(entity)" title="Eliminar">🗑️</button>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+          <p v-else class="no-data-small">No hay entidades financieras registradas</p>
+        </div>
       </div>
     </div>
 
@@ -606,6 +608,18 @@ const formatRate = (rate) => {
   font-size: 14px;
 }
 
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Hacer la tabla scrollable horizontalmente */
+.financial-card {
+  overflow: hidden;
+}
+
+.table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 1024px) {
   .top-section {
     grid-template-columns: 1fr;
@@ -616,6 +630,119 @@ const formatRate = (rate) => {
   .profile-header {
     flex-direction: column;
     text-align: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .settings-page {
+    padding: 20px 15px;
+  }
+
+  .page-title {
+    font-size: 22px;
+  }
+
+  .profile-card, .defaults-card, .financial-card {
+    padding: 20px;
+    border-radius: 12px;
+  }
+
+  .profile-card h2, .defaults-card h2, .financial-card h2 {
+    font-size: 18px;
+  }
+
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .add-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .financial-table {
+    min-width: 500px;
+    font-size: 13px;
+  }
+
+  .financial-table th, .financial-table td {
+    padding: 10px 8px;
+    white-space: nowrap;
+  }
+
+  /* Modal responsive */
+  .modal {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .save-btn, .cancel-btn {
+    width: 100%;
+  }
+
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 28px;
+  }
+
+  .profile-name h3 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 480px) {
+  .settings-page {
+    padding: 15px 10px;
+  }
+
+  .page-title {
+    font-size: 20px;
+  }
+
+  .profile-card, .defaults-card, .financial-card {
+    padding: 15px;
+  }
+
+  .field .label {
+    font-size: 12px;
+  }
+
+  .field .value {
+    font-size: 13px;
+  }
+
+  .financial-table {
+    min-width: 450px;
+  }
+
+  .financial-table th, .financial-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .profile-avatar {
+    width: 70px;
+    height: 70px;
+    font-size: 24px;
+  }
+
+  .modal {
+    padding: 15px;
+  }
+
+  .modal h3 {
+    font-size: 18px;
   }
 }
 </style>

@@ -56,7 +56,10 @@ export default {
       // Modal de confirmación de eliminación
       showDeleteModal: false,
       propertyToDelete: null,
-      deleting: false
+      deleting: false,
+
+      // Estado de carga para editar
+      loadingEdit: false
     };
   },
   async mounted() {
@@ -158,36 +161,57 @@ export default {
     },
 
     async openEditModal(property) {
-      this.isEditing = true;
-      this.editingPropertyId = property.id;
-      this.propertyForm = {
-        code: property.code,
-        title: property.title,
-        description: property.description || "",
-        address: property.address,
-        district: property.district,
-        province: property.province,
-        type: property.type,
-        areaM2: property.areaM2,
-        price: property.price,
-        currency: property.currency,
-        imagesUrl: ""
-      };
-      // Cargar imágenes existentes
-      this.uploadedImages = [];
-      if (property.images && property.images.length > 0) {
-        this.uploadedImages = property.images.map(img => ({
-          url: img.url,
-          existing: true
-        }));
-      } else if (property.imagesUrl && property.imagesUrl.length > 0) {
-        this.uploadedImages = property.imagesUrl.map(url => ({
-          url: url,
-          existing: true
-        }));
+      try {
+        this.isEditing = true;
+        this.editingPropertyId = property.id;
+        this.loadingEdit = true;
+        this.showModal = true;
+        
+        // Primero cargar los datos completos de la propiedad desde el backend
+        const fullProperty = await PropertiesAssembler.getProperty(property.id);
+        
+        this.propertyForm = {
+          code: fullProperty.code || "",
+          title: fullProperty.title || "",
+          description: fullProperty.description || "",
+          address: fullProperty.address || "",
+          district: fullProperty.district || "",
+          province: fullProperty.province || "",
+          type: fullProperty.type || 1,
+          areaM2: fullProperty.areaM2 || 0,
+          price: fullProperty.price || 0,
+          currency: fullProperty.currency || 1,
+          imagesUrl: ""
+        };
+        
+        // Cargar imágenes existentes
+        this.uploadedImages = [];
+        if (fullProperty.images && fullProperty.images.length > 0) {
+          this.uploadedImages = fullProperty.images.map(img => ({
+            url: img.url || img,
+            existing: true
+          }));
+        } else if (fullProperty.imagesUrl && fullProperty.imagesUrl.length > 0) {
+          this.uploadedImages = fullProperty.imagesUrl.map(url => ({
+            url: url,
+            existing: true
+          }));
+        } else if (fullProperty.thumbnailUrl) {
+          // Si solo hay thumbnailUrl, usarlo como imagen existente
+          this.uploadedImages = [{
+            url: fullProperty.thumbnailUrl,
+            existing: true
+          }];
+        }
+        
+        this.uploadProgress = {};
+      } catch (error) {
+        console.error("Error cargando datos de la propiedad:", error);
+        alert("Error al cargar los datos de la propiedad para editar");
+        this.showModal = false;
+      } finally {
+        this.loadingEdit = false;
       }
-      this.uploadProgress = {};
-      this.showModal = true;
     },
 
     async saveProperty() {
@@ -374,8 +398,48 @@ export default {
 
     editFromDetail() {
       if (this.selectedProperty) {
+        const fullProperty = this.selectedProperty;
         this.closeDetailModal();
-        this.openEditModal(this.selectedProperty);
+        
+        // Usar los datos ya cargados directamente sin llamar al backend de nuevo
+        this.isEditing = true;
+        this.editingPropertyId = fullProperty.id;
+        
+        this.propertyForm = {
+          code: fullProperty.code || "",
+          title: fullProperty.title || "",
+          description: fullProperty.description || "",
+          address: fullProperty.address || "",
+          district: fullProperty.district || "",
+          province: fullProperty.province || "",
+          type: fullProperty.type || 1,
+          areaM2: fullProperty.areaM2 || 0,
+          price: fullProperty.price || 0,
+          currency: fullProperty.currency || 1,
+          imagesUrl: ""
+        };
+        
+        // Cargar imágenes existentes
+        this.uploadedImages = [];
+        if (fullProperty.images && fullProperty.images.length > 0) {
+          this.uploadedImages = fullProperty.images.map(img => ({
+            url: img.url || img,
+            existing: true
+          }));
+        } else if (fullProperty.imagesUrl && fullProperty.imagesUrl.length > 0) {
+          this.uploadedImages = fullProperty.imagesUrl.map(url => ({
+            url: url,
+            existing: true
+          }));
+        } else if (fullProperty.thumbnailUrl) {
+          this.uploadedImages = [{
+            url: fullProperty.thumbnailUrl,
+            existing: true
+          }];
+        }
+        
+        this.uploadProgress = {};
+        this.showModal = true;
       }
     },
 
@@ -459,9 +523,8 @@ export default {
               </div>
             </div>
             <p class="address">{{ property.address }}</p>
-            <p class="address">{{ property.district }}, {{ property.province }}</p>
+            <p class="address">{{ property.district }}</p>
             <p v-if="property.description" class="description">{{ property.description }}</p>
-            <p class="meta">Área: {{ property.areaM2 }} m²</p>
             <p class="price">{{ getCurrencySymbol(property.currency) }} {{ property.price?.toLocaleString() }}</p>
             <p class="meta">Consultas: {{ property.consultsCount || 0 }}</p>
           </div>
@@ -495,7 +558,14 @@ export default {
     <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
       <div class="modal-content">
         <h2>{{ isEditing ? 'Editar Propiedad' : 'Nueva Propiedad' }}</h2>
-        <form @submit.prevent="saveProperty">
+        
+        <!-- Loading state mientras se cargan los datos para editar -->
+        <div v-if="loadingEdit" class="loading-edit">
+          <span class="spinner-large"></span>
+          <p>Cargando datos de la propiedad...</p>
+        </div>
+        
+        <form v-else @submit.prevent="saveProperty">
           <div class="form-group">
             <label>Código *</label>
             <input v-model="propertyForm.code" type="text" required />
@@ -1087,6 +1157,7 @@ export default {
   line-height: 1.4;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -1229,6 +1300,16 @@ export default {
 }
 
 .loading-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 15px;
+  color: #377fbd;
+}
+
+.loading-edit {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1528,5 +1609,183 @@ export default {
 .cancel-btn:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* ===== RESPONSIVE STYLES ===== */
+
+/* Tablets */
+@media (max-width: 1024px) {
+  .properties-container {
+    padding: 25px 30px;
+  }
+
+  .header-section {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+
+  .actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .search-input {
+    flex: 1;
+    min-width: 200px;
+  }
+
+  .properties-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .properties-container {
+    padding: 20px 15px;
+  }
+
+  .header-section h1 {
+    font-size: 22px;
+  }
+
+  .actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .search-btn, .add-btn {
+    width: 100%;
+    text-align: center;
+  }
+
+  .properties-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .property-card {
+    max-width: 100%;
+  }
+
+  .property-image {
+    height: 180px;
+  }
+
+  .property-info {
+    padding: 15px;
+  }
+
+  /* Modal responsive */
+  .modal-content {
+    width: 95%;
+    max-width: 95%;
+    padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal-content h2 {
+    font-size: 20px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* Detail modal */
+  .detail-modal {
+    max-width: 95%;
+    padding: 20px;
+  }
+
+  .property-gallery {
+    height: 200px;
+  }
+
+  .gallery-thumbnails {
+    gap: 8px;
+  }
+
+  .gallery-thumbnails img {
+    width: 50px;
+    height: 50px;
+  }
+
+  .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .info-item {
+    padding: 10px;
+  }
+
+  .detail-actions {
+    flex-direction: column;
+  }
+
+  .action-btn {
+    width: 100%;
+  }
+
+  /* Pagination */
+  .pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .pagination button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .properties-container {
+    padding: 15px 10px;
+  }
+
+  .header-section h1 {
+    font-size: 20px;
+  }
+
+  .property-title {
+    font-size: 15px;
+  }
+
+  .property-price {
+    font-size: 16px;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .delete-confirm-modal {
+    padding: 20px;
+  }
+
+  .delete-modal-actions {
+    flex-direction: column;
+  }
 }
 </style>
