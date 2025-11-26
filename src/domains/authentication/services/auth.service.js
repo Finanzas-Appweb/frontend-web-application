@@ -1,44 +1,62 @@
-// 1. Importamos el CLIENTE central, no creamos un nuevo axios
 import apiClient from "../../../shared/infraestructure/services/api.client.js";
 
-export const login = async (username, password) => {
+export const login = async (email, password) => {
     try {
-        const response = await apiClient.get('/users', {
-            params: {
-                username: username,
-                password: password
-            }
+        const response = await apiClient.post('/auth/login', {
+            email,
+            password
         });
 
-        if (response.data.length > 0) {
-            const user = response.data[0];
+        const { token, user } = response.data;
 
-            const fakeToken = `fake-jwt-token-for-${user.username}`;
-            localStorage.setItem('user-token', fakeToken);
+        // Guardar token y datos de usuario
+        localStorage.setItem('user-token', token);
+        localStorage.setItem('user-data', JSON.stringify(user));
 
-            delete user.password;
-            return user;
-
-        } else {
-            throw new Error('Usuario o contraseña incorrectos');
-        }
+        return user;
     } catch (error) {
-        console.error("Error en el login:", error.message);
-        throw error;
+        const errorMessage = error.response?.data?.detail || error.response?.data?.title || 'Usuario o contraseña incorrectos';
+        throw new Error(errorMessage);
     }
 };
 
 export const register = async (userData) => {
     try {
-        const response = await apiClient.post('/users', userData);
+        // userData debe contener: username, firstName, lastName, dni, email, phone, password
+        const response = await apiClient.post('/auth/register', userData);
 
-        return response.data;
+        const { token, user } = response.data;
 
+        // Guardar token y datos de usuario
+        localStorage.setItem('user-token', token);
+        localStorage.setItem('user-data', JSON.stringify(user));
+
+        return user;
     } catch (error) {
-        console.error("Error en el registro:", error);
-        throw error;
+        const errorMessage = error.response?.data?.detail || error.response?.data?.title || 'Error al registrar usuario';
+        throw new Error(errorMessage);
     }
 };
+
 export const logout = () => {
     localStorage.removeItem('user-token');
+    localStorage.removeItem('user-data');
 };
+
+export const getCurrentUser = () => {
+    const userData = localStorage.getItem('user-data');
+    return userData ? JSON.parse(userData) : null;
+};
+
+export const isAuthenticated = () => {
+    return !!localStorage.getItem('user-token');
+};
+
+export const hasRole = (role) => {
+    const user = getCurrentUser();
+    return user?.role === role;
+};
+
+export const isAdmin = () => hasRole('Admin');
+export const isAgent = () => hasRole('Agent');
+export const isUser = () => hasRole('User');

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted, computed } from "vue";
 import { Bar, Pie } from "vue-chartjs";
 import {
   Chart as ChartJS,
@@ -12,6 +12,7 @@ import {
   ArcElement,
 } from "chart.js";
 import { Eye } from "lucide-vue-next";
+import { ReportsAssembler } from "../services/reports.assembler.js";
 import NavBar from "../../../shared/presentation/components/nav-bar.vue";
 import FooterContent from "../../../shared/presentation/components/footer-content.vue";
 
@@ -25,38 +26,96 @@ ChartJS.register(
     ArcElement
 );
 
-// 🧾 Datos de ejemplo
-const topProperties = ref([
-  { code: "P0001", address: "Av. Primavera 540, Surco", consultas: 58 },
-  { code: "P0002", address: "Calle Las Orquídeas 210, Miraflores", consultas: 45 },
-  { code: "P0003", address: "Jr. Los Álamos 890, La Molina", consultas: 39 },
-  { code: "P0004", address: "Av. Colonial 3050, Lima Cercado", consultas: 22 },
-]);
+const loading = ref(true);
+const topProperties = ref([]);
+const simulationsData = ref([]);
+const entityData = ref([]);
+const propertyConsultsData = ref([]);
+const errorMessage = ref("");
 
-const simulationsByMonth = {
-  labels: ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
-  datasets: [
-    {
-      label: "Simulaciones",
-      backgroundColor: "#377FBD",
-      borderRadius: 8,
-      barThickness: 26,
-      data: [14, 18, 22, 19, 25, 30, 27, 35, 33, 28, 31, 24],
-    },
-  ],
-};
+// Cargar datos del backend
+onMounted(async () => {
+  try {
+    loading.value = true;
+    errorMessage.value = "";
 
-const entitySelection = {
-  labels: ["BCP", "Interbank", "BBVA", "Scotiabank"],
-  datasets: [
-    {
-      label: "Entidades",
-      backgroundColor: ["#377FBD", "#5BA3D0", "#82C4F0", "#A4D8F6"],
-      hoverOffset: 12,
-      data: [40, 25, 20, 15],
-    },
-  ],
-};
+    const [
+      ,
+      propsResult,
+      simsResult,
+      entityResult,
+      propConsultsResult
+    ] = await Promise.all([
+      ReportsAssembler.getReportsSummary(),
+      ReportsAssembler.getMostConsultedProperties(),
+      ReportsAssembler.getSimulationsByMonth(12),
+      ReportsAssembler.getEntitySelection(),
+      ReportsAssembler.getPropertyConsultsByMonth()
+    ]);
+
+    // Usamos summaryResult por si luego mostramos tarjetas; de momento solo almacenamos listas
+    topProperties.value = propsResult || [];
+    simulationsData.value = simsResult || [];
+    entityData.value = entityResult || [];
+    propertyConsultsData.value = propConsultsResult?.data || propConsultsResult || [];
+  } catch (error) {
+    console.error("Error cargando reportes:", error);
+    errorMessage.value = error.response?.data?.title || "No se pudieron cargar los reportes";
+    if (error.response?.data?.title) {
+      alert(`Error: ${error.response.data.title}`);
+    }
+  } finally {
+    loading.value = false;
+  }
+});
+
+// Datos para gráfico de barras
+const simulationsByMonth = computed(() => {
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return {
+    labels: simulationsData.value.map(item => `${monthNames[(item.month || 1) - 1]} ${item.year || ''}`),
+    datasets: [
+      {
+        label: "Simulaciones",
+        backgroundColor: "#377FBD",
+        borderRadius: 8,
+        barThickness: 26,
+        data: simulationsData.value.map(item => item.count ?? 0),
+      },
+    ],
+  };
+});
+
+// Datos para gráfico de torta - mostrar count y percentage
+const entitySelection = computed(() => {
+  return {
+    labels: entityData.value.map(e => `${e.bankName} (${e.count || 0})`),
+    datasets: [
+      {
+        label: "Entidades",
+        backgroundColor: ["#377FBD", "#5BA3D0", "#82C4F0", "#A4D8F6", "#4dd0e1"],
+        hoverOffset: 12,
+        data: entityData.value.map(e => e.count ?? 0), // Usar count en lugar de percentage
+      },
+    ],
+  };
+});
+
+const propertyConsultsByMonth = computed(() => {
+  const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+  return {
+    labels: propertyConsultsData.value.map(item => `${monthNames[(item.month || 1) - 1]} ${item.year || ''}`),
+    datasets: [
+      {
+        label: "Consultas a Propiedades",
+        backgroundColor: "#5BA3D0",
+        borderRadius: 8,
+        barThickness: 26,
+        data: propertyConsultsData.value.map(item => item.count ?? 0),
+      },
+    ],
+  };
+});
 
 const chartOptions = {
   responsive: true,
@@ -79,8 +138,34 @@ const chartOptions = {
   },
 };
 
+const pieChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: "bottom",
+      labels: { color: "#2D6BA1", font: { size: 13, weight: "500" } },
+    },
+    tooltip: {
+      callbacks: {
+        label: function(context) {
+          const item = entityData.value[context.dataIndex];
+          if (item) {
+            return `${item.bankName}: ${item.count || 0} simulaciones (${(item.percentage || 0).toFixed(1)}%)`;
+          }
+          return context.label;
+        }
+      }
+    }
+  },
+};
+
+const getCurrencySymbol = (currency) => {
+  return currency === 'USD' || currency === 2 ? '$' : 'S/';
+};
+
 const verDetalles = (propiedad) => {
-  alert(`Detalles de la propiedad ${propiedad.code}:\n${propiedad.address}`);
+  alert(`Detalles de la propiedad ${propiedad.code}:\n${propiedad.title || propiedad.address}\nConsultas: ${propiedad.consultCount}`);
 };
 </script>
 
@@ -89,43 +174,54 @@ const verDetalles = (propiedad) => {
   <div class="reports-view">
     <h1>Reportes Generales</h1>
 
+    <div v-if="loading" class="loading-container">
+      <p>Cargando reportes...</p>
+    </div>
+    <div v-else-if="errorMessage" class="loading-container">
+      <p>{{ errorMessage }}</p>
+    </div>
+
     <!-- CONTENEDOR PRINCIPAL -->
-    <div class="reports-layout">
+    <div v-else class="reports-layout">
       <!-- FILA SUPERIOR -->
       <div class="top-row">
         <!-- 🏠 Propiedades más consultadas -->
         <div class="report-card">
           <h2>Propiedades más consultadas</h2>
           <div class="table-wrapper">
-            <table>
+            <table v-if="topProperties.length > 0">
               <thead>
               <tr>
                 <th>Código</th>
-                <th>Dirección</th>
+                <th>Título</th>
+                <th>Precio</th>
                 <th>Consultas</th>
                 <th></th>
               </tr>
               </thead>
               <tbody>
-              <tr v-for="prop in topProperties" :key="prop.code">
+              <tr v-for="prop in topProperties" :key="prop.propertyId || prop.code">
                 <td>{{ prop.code }}</td>
-                <td>{{ prop.address }}</td>
-                <td>{{ prop.consultas }}</td>
+                <td>{{ prop.title }}</td>
+                <td>{{ getCurrencySymbol(prop.currency) }} {{ prop.price?.toLocaleString() }}</td>
+                <td><strong>{{ prop.consultCount }}</strong></td>
                 <td class="eye-cell" @click="verDetalles(prop)">
                   <Eye class="eye-icon" />
                 </td>
               </tr>
               </tbody>
             </table>
+            <p v-else class="no-data-small">No hay datos de propiedades consultadas</p>
           </div>
         </div>
 
         <!-- 🏦 Selección de Entidades Financieras -->
         <div class="report-card">
           <h2>Selección de Entidades Financieras</h2>
-          <div class="chart-wrapper">
-            <Pie :data="entitySelection" :options="chartOptions" />
+          <div v-if="entityData.length > 0" class="chart-wrapper">
+            <Pie :data="entitySelection" :options="pieChartOptions" />
           </div>
+          <p v-else class="no-data-small">No hay datos de selección de entidades</p>
         </div>
       </div>
 
@@ -134,8 +230,16 @@ const verDetalles = (propiedad) => {
         <!-- 📊 Simulaciones por mes -->
         <div class="report-card">
           <h2>Simulaciones por Mes</h2>
-          <div class="chart-wrapper">
+          <div v-if="simulationsData.length > 0" class="chart-wrapper">
             <Bar :data="simulationsByMonth" :options="chartOptions" />
+          </div>
+          <p v-else class="no-data-small">No hay datos de simulaciones</p>
+        </div>
+
+        <div class="report-card" v-if="propertyConsultsData.length">
+          <h2>Consultas de Propiedades por Mes</h2>
+          <div class="chart-wrapper">
+            <Bar :data="propertyConsultsByMonth" :options="chartOptions" />
           </div>
         </div>
       </div>
@@ -179,6 +283,13 @@ const verDetalles = (propiedad) => {
 
 .bottom-row .report-card {
   width: 100%; /* 100% debajo */
+}
+.bottom-row {
+  display: flex;
+  gap: 30px;
+}
+.bottom-row .report-card:last-child {
+  flex: 1;
 }
 
 /* TARJETAS */
@@ -260,5 +371,20 @@ tr:hover {
   .top-row {
     flex-direction: column;
   }
+}
+
+.loading-container {
+  text-align: center;
+  padding: 50px;
+  color: #377FBD;
+  font-size: 18px;
+}
+
+.no-data-small {
+  text-align: center;
+  padding: 30px;
+  color: #666;
+  font-style: italic;
+  font-size: 14px;
 }
 </style>

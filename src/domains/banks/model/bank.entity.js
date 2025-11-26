@@ -1,7 +1,8 @@
-export class FinancialEntity {
+export class Bank {
     constructor({ 
         id = 0, 
         name = "", 
+        description = "",
         annualRateTea = 0,
         annualRateTna = 0,
         effectiveFrom = null,
@@ -9,6 +10,7 @@ export class FinancialEntity {
     } = {}) {
         this.id = id;
         this.name = name;
+        this.description = description;
         this.annualRateTea = annualRateTea;
         this.annualRateTna = annualRateTna;
         this.effectiveFrom = effectiveFrom;

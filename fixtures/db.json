@@ -39,6 +39,16 @@
       "phone": "953091144",
       "email": "ronald@gmail.com",
       "password": "12345678"
+    },
+    {
+      "id": "d9dd",
+      "username": "hola12",
+      "firstName": "pedro",
+      "lastName": "giancarlo",
+      "dni": "84219821",
+      "phone": "98421984",
+      "email": "hola123@gmail.com",
+      "password": "hola123"
     }
   ],
   "clients": [
@@ -144,6 +154,37 @@
         "ratioDeudaIngreso": 0.05
       },
       "createdAt": "2025-11-11T04:54:38.145Z"
+    },
+    {
+      "id": "82dd",
+      "clientId": 1,
+      "propertyId": 1,
+      "simulationInput": {
+        "monto": 500000,
+        "cuotaInicial": 50000,
+        "bonoMiVivienda": 0,
+        "plazo": 20,
+        "moneda": "soles",
+        "tipoTasa": "efectiva",
+        "tasa": 8.5,
+        "periodoGracia": "0 meses",
+        "tipoPeriodoGracia": "sin gracia",
+        "seguroDesgravamen": 0.028,
+        "seguroInmueble": 0.025
+      },
+      "simulationOutput": {
+        "cuotaMensual": "4067.18",
+        "tcea": "8.67",
+        "tir": 8.5,
+        "van": "526123.01",
+        "costoTotal": "976123.01",
+        "montoPrestamo": "450000.00",
+        "interesesTotales": "526123.01",
+        "porcentajeFinanciado": "90.00",
+        "fechaFinCredito": "noviembre de 2045",
+        "ratioDeudaIngreso": "0.27"
+      },
+      "createdAt": "2025-11-21T06:24:39.996Z"
     }
   ],
   "profile": {

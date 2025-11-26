@@ -1,6 +1,6 @@
 <script>
-import { ref, onMounted } from "vue";
-import ApiService from "../shared/infraestructure/services/api.service.js";
+import { ref, onMounted, watch } from "vue";
+import { ReportsAssembler } from "../domains/reports/services/reports.assembler.js";
 import { Chart, registerables } from "chart.js";
 import NavBar from "../shared/presentation/components/nav-bar.vue";
 import FooterContent from "../shared/presentation/components/footer-content.vue";
@@ -11,92 +11,140 @@ export default {
   name: "Home",
   components: {FooterContent, NavBar},
   setup() {
-    const dashboardStats = ref({});
-    const recentSimulations = ref([]);
+    const monthNames = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+    const statistics = ref({
+      registeredClients: 0,
+      totalUsers: 0,
+      totalProperties: 0,
+      totalSimulations: 0
+    });
+    const lastActivities = ref([]);
     const simulationsByMonth = ref([]);
     const entitySelection = ref([]);
-    const clients = ref([]);
+    const loading = ref(true);
+    const errorMessage = ref("");
+    const chartsReady = ref(false);
+
+    let barChartInstance = null;
+    let pieChartInstance = null;
 
     const loadData = async () => {
       try {
-        // Dashboard stats
-        const statsResp = await ApiService.getDashboardStats();
-        dashboardStats.value = statsResp.data;
+        loading.value = true;
+        errorMessage.value = "";
+        
+        const [
+          summaryData,
+          simsByMonthData,
+          entitySelectionData
+        ] = await Promise.all([
+          ReportsAssembler.getReportsSummary(),
+          ReportsAssembler.getSimulationsByMonth(12),
+          ReportsAssembler.getEntitySelection()
+        ]);
 
-        // Clientes
-        const clientsResp = await ApiService.getClients();
-        clients.value = clientsResp.data;
+        statistics.value = summaryData?.statistics || statistics.value;
+        lastActivities.value = summaryData?.lastActivities?.slice(0, 5) || [];
+        simulationsByMonth.value = simsByMonthData || [];
+        entitySelection.value = entitySelectionData || [];
 
-        // Últimas simulaciones
-        const simsResp = await ApiService.getSimulations();
-        recentSimulations.value = simsResp.data
-            .map(sim => ({
-              ...sim,
-              client: clients.value.find(c => c.id == sim.clientId),
-            }))
-            .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-            .slice(0, 5);
-
-        // Gráficos
-        const simsByMonthResp = await ApiService.getSimulationsByMonthReport();
-        simulationsByMonth.value = simsByMonthResp.data;
-
-        const entitySelectionResp = await ApiService.getEntitySelectionReport();
-        entitySelection.value = entitySelectionResp.data;
-
-        createCharts();
       } catch (err) {
-        console.error(err);
+        console.error('Error al cargar datos del dashboard:', err);
+        errorMessage.value = err.response?.data?.title || "No se pudieron cargar los reportes";
+      } finally {
+        loading.value = false;
+        chartsReady.value = true;
       }
     };
 
     const createCharts = () => {
-      if (simulationsByMonth.value.length && entitySelection.value.length) {
-        // Bar chart
-        const ctx1 = document.getElementById("barChart").getContext("2d");
-        new Chart(ctx1, {
-          type: "bar",
-          data: {
-            labels: simulationsByMonth.value.map(m => m.month),
-            datasets: [
-              {
-                label: "Simulaciones",
-                data: simulationsByMonth.value.map(m => m.count),
-                backgroundColor: "#4fc3f7",
-                borderRadius: 5,
-              },
-            ],
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } },
-          },
-        });
-
-        // Pie chart
-        const ctx2 = document.getElementById("pieChart").getContext("2d");
-        new Chart(ctx2, {
-          type: "pie",
-          data: {
-            labels: entitySelection.value.map(e => e.name),
-            datasets: [
-              {
-                data: entitySelection.value.map(e => e.percentage),
-                backgroundColor: ["#29b6f6", "#81d4fa", "#03a9f4", "#0288d1"],
-              },
-            ],
-          },
-          options: { responsive: true },
-        });
+      // Destruir charts anteriores si existen
+      if (barChartInstance) {
+        barChartInstance.destroy();
+        barChartInstance = null;
       }
+      if (pieChartInstance) {
+        pieChartInstance.destroy();
+        pieChartInstance = null;
+      }
+
+      // Esperar un frame para asegurar que el DOM esté listo
+      setTimeout(() => {
+        if (simulationsByMonth.value.length > 0) {
+          const ctx1 = document.getElementById("barChart");
+          if (ctx1) {
+            barChartInstance = new Chart(ctx1.getContext("2d"), {
+              type: "bar",
+              data: {
+                labels: simulationsByMonth.value.map(m => `${monthNames[(m.month || 1) - 1]} ${m.year || ''}`),
+                datasets: [
+                  {
+                    label: "Simulaciones",
+                    data: simulationsByMonth.value.map(m => m.count ?? 0),
+                    backgroundColor: "#4fc3f7",
+                    borderRadius: 5,
+                  },
+                ],
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: true, position: 'bottom' } },
+                scales: { y: { beginAtZero: true } },
+              },
+            });
+          }
+        }
+
+        if (entitySelection.value.length > 0) {
+          const ctx2 = document.getElementById("pieChart");
+          if (ctx2) {
+            pieChartInstance = new Chart(ctx2.getContext("2d"), {
+              type: "pie",
+              data: {
+                labels: entitySelection.value.map(e => `${e.bankName} (${e.count || 0})`),
+                datasets: [
+                  {
+                    data: entitySelection.value.map(e => e.count ?? e.percentage ?? 0),
+                    backgroundColor: ["#29b6f6", "#81d4fa", "#03a9f4", "#0288d1", "#4dd0e1"],
+                  },
+                ],
+              },
+              options: { 
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: {
+                    position: 'bottom'
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label: function(context) {
+                        const item = entitySelection.value[context.dataIndex];
+                        return `${item.bankName}: ${item.count || 0} (${(item.percentage || 0).toFixed(1)}%)`;
+                      }
+                    }
+                  }
+                }
+              },
+            });
+          }
+        }
+      }, 100);
     };
+
+    // Watch para crear charts cuando chartsReady cambie y loading sea false
+    watch([chartsReady, loading], ([ready, isLoading]) => {
+      if (ready && !isLoading) {
+        createCharts();
+      }
+    });
 
     onMounted(() => {
       loadData();
     });
 
-    return { dashboardStats, recentSimulations };
+    return { statistics, lastActivities, loading, errorMessage, simulationsByMonth, entitySelection };
   },
 };
 </script>
@@ -104,60 +152,89 @@ export default {
 <template>
   <nav-bar></nav-bar>
   <div class="home-container">
-    <!-- Cartas de estadísticas -->
-    <div class="stats-cards">
-      <div class="card">
-        <h3>Clientes</h3>
-        <p>{{ dashboardStats.clientsCount || 0 }}</p>
-      </div>
-      <div class="card">
-        <h3>Simulaciones este mes</h3>
-        <p>{{ dashboardStats.simulationsThisMonth || 0 }}</p>
-      </div>
-      <div class="card">
-        <h3>Propiedades</h3>
-        <p>{{ dashboardStats.propertiesCount || 0 }}</p>
-      </div>
+    <div v-if="loading" class="loading-container">
+      <p>Cargando dashboard...</p>
     </div>
 
-    <!-- Tabla de últimos movimientos -->
-    <div class="table-container">
-      <h3>Últimas simulaciones</h3>
-      <table>
-        <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Acción</th>
-          <th>Usuario</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr v-for="sim in recentSimulations" :key="sim.id">
-          <td>{{ new Date(sim.createdAt).toLocaleDateString() }}</td>
-          <td>Simulación de crédito</td>
-          <td>{{ sim.client?.name || sim.clientId }}</td>
-        </tr>
-        </tbody>
-      </table>
+    <div v-else-if="errorMessage" class="error-container">
+      <p>{{ errorMessage }}</p>
     </div>
 
-    <!-- Gráficos -->
-    <div class="charts-container">
-      <div class="chart-card">
-        <h3>Simulaciones por mes</h3>
-        <canvas id="barChart"></canvas>
+    <template v-else>
+      <!-- Cartas de estadísticas -->
+      <div class="stats-cards">
+        <div class="card">
+          <h3>Clientes</h3>
+          <p>{{ statistics.registeredClients }}</p>
+        </div>
+        <div class="card">
+          <h3>Simulaciones Totales</h3>
+          <p>{{ statistics.totalSimulations }}</p>
+        </div>
+        <div class="card">
+          <h3>Propiedades</h3>
+          <p>{{ statistics.totalProperties }}</p>
+        </div>
+        <div class="card">
+          <h3>Usuarios</h3>
+          <p>{{ statistics.totalUsers }}</p>
+        </div>
       </div>
-      <div class="chart-card">
-        <h3>Selección de entidades</h3>
-        <canvas id="pieChart"></canvas>
-      </div>
-    </div>
 
-    <!-- Botones -->
-    <div class="buttons-container">
-      <button class="btn">Simular un crédito</button>
-      <button class="btn">Gestionar clientes</button>
-    </div>
+      <!-- Tabla de últimas actividades -->
+      <div class="table-container">
+        <h3>Últimas Actividades</h3>
+        <table v-if="lastActivities.length > 0">
+          <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Acción</th>
+            <th>Entidad</th>
+            <th>Usuario</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="activity in lastActivities" :key="activity.id">
+            <td>{{ new Date(activity.createdAt).toLocaleString('es-PE', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric', 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            }) }}</td>
+            <td>{{ activity.action }}</td>
+            <td>{{ activity.entity }}</td>
+            <td>{{ activity.userName }}</td>
+          </tr>
+          </tbody>
+        </table>
+        <p v-else class="no-data">No hay actividades recientes</p>
+      </div>
+
+      <!-- Gráficos -->
+      <div class="charts-container">
+        <div class="chart-card">
+          <h3>Simulaciones por mes</h3>
+          <div class="chart-wrapper">
+            <canvas v-if="simulationsByMonth.length" id="barChart"></canvas>
+            <p v-else class="no-data">No hay datos de simulaciones por mes</p>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3>Selección de entidades</h3>
+          <div class="chart-wrapper">
+            <canvas v-if="entitySelection.length" id="pieChart"></canvas>
+            <p v-else class="no-data">No hay datos de entidades</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botones -->
+      <div class="buttons-container">
+        <button class="btn" @click="$router.push('/simulator')">Simular un crédito</button>
+        <button class="btn" @click="$router.push('/clients')">Gestionar clientes</button>
+      </div>
+    </template>
   </div>
   <footer-content></footer-content>
 </template>
@@ -242,6 +319,10 @@ tr:nth-child(even) {
   color: #0277bd;
   text-align: center;
 }
+.chart-wrapper {
+  height: 280px;
+  position: relative;
+}
 
 /* Buttons */
 .buttons-container {
@@ -261,5 +342,26 @@ tr:nth-child(even) {
 }
 .btn:hover {
   background-color: #0288d1;
+}
+
+.loading-container {
+  text-align: center;
+  padding: 50px;
+  color: #377FBD;
+  font-size: 18px;
+}
+
+.no-data {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.error-container {
+  text-align: center;
+  padding: 40px;
+  color: #c53030;
+  font-weight: 600;
 }
 </style>
