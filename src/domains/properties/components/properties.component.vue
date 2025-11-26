@@ -56,7 +56,10 @@ export default {
       // Modal de confirmación de eliminación
       showDeleteModal: false,
       propertyToDelete: null,
-      deleting: false
+      deleting: false,
+
+      // Estado de carga para editar
+      loadingEdit: false
     };
   },
   async mounted() {
@@ -158,36 +161,57 @@ export default {
     },
 
     async openEditModal(property) {
-      this.isEditing = true;
-      this.editingPropertyId = property.id;
-      this.propertyForm = {
-        code: property.code,
-        title: property.title,
-        description: property.description || "",
-        address: property.address,
-        district: property.district,
-        province: property.province,
-        type: property.type,
-        areaM2: property.areaM2,
-        price: property.price,
-        currency: property.currency,
-        imagesUrl: ""
-      };
-      // Cargar imágenes existentes
-      this.uploadedImages = [];
-      if (property.images && property.images.length > 0) {
-        this.uploadedImages = property.images.map(img => ({
-          url: img.url,
-          existing: true
-        }));
-      } else if (property.imagesUrl && property.imagesUrl.length > 0) {
-        this.uploadedImages = property.imagesUrl.map(url => ({
-          url: url,
-          existing: true
-        }));
+      try {
+        this.isEditing = true;
+        this.editingPropertyId = property.id;
+        this.loadingEdit = true;
+        this.showModal = true;
+        
+        // Primero cargar los datos completos de la propiedad desde el backend
+        const fullProperty = await PropertiesAssembler.getProperty(property.id);
+        
+        this.propertyForm = {
+          code: fullProperty.code || "",
+          title: fullProperty.title || "",
+          description: fullProperty.description || "",
+          address: fullProperty.address || "",
+          district: fullProperty.district || "",
+          province: fullProperty.province || "",
+          type: fullProperty.type || 1,
+          areaM2: fullProperty.areaM2 || 0,
+          price: fullProperty.price || 0,
+          currency: fullProperty.currency || 1,
+          imagesUrl: ""
+        };
+        
+        // Cargar imágenes existentes
+        this.uploadedImages = [];
+        if (fullProperty.images && fullProperty.images.length > 0) {
+          this.uploadedImages = fullProperty.images.map(img => ({
+            url: img.url || img,
+            existing: true
+          }));
+        } else if (fullProperty.imagesUrl && fullProperty.imagesUrl.length > 0) {
+          this.uploadedImages = fullProperty.imagesUrl.map(url => ({
+            url: url,
+            existing: true
+          }));
+        } else if (fullProperty.thumbnailUrl) {
+          // Si solo hay thumbnailUrl, usarlo como imagen existente
+          this.uploadedImages = [{
+            url: fullProperty.thumbnailUrl,
+            existing: true
+          }];
+        }
+        
+        this.uploadProgress = {};
+      } catch (error) {
+        console.error("Error cargando datos de la propiedad:", error);
+        alert("Error al cargar los datos de la propiedad para editar");
+        this.showModal = false;
+      } finally {
+        this.loadingEdit = false;
       }
-      this.uploadProgress = {};
-      this.showModal = true;
     },
 
     async saveProperty() {
@@ -495,7 +519,14 @@ export default {
     <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
       <div class="modal-content">
         <h2>{{ isEditing ? 'Editar Propiedad' : 'Nueva Propiedad' }}</h2>
-        <form @submit.prevent="saveProperty">
+        
+        <!-- Loading state mientras se cargan los datos para editar -->
+        <div v-if="loadingEdit" class="loading-edit">
+          <span class="spinner-large"></span>
+          <p>Cargando datos de la propiedad...</p>
+        </div>
+        
+        <form v-else @submit.prevent="saveProperty">
           <div class="form-group">
             <label>Código *</label>
             <input v-model="propertyForm.code" type="text" required />
@@ -1230,6 +1261,16 @@ export default {
 }
 
 .loading-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 15px;
+  color: #377fbd;
+}
+
+.loading-edit {
   display: flex;
   flex-direction: column;
   align-items: center;

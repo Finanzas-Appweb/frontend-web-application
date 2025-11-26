@@ -234,30 +234,32 @@ const formatRate = (rate) => {
           <h2>Entidades Financieras</h2>
           <button v-if="permissions.canManageBanks.value" class="add-btn" @click="openAddEntity">+ Añadir Entidad</button>
         </div>
-        <table v-if="financialEntities.length > 0" class="financial-table">
-          <thead>
-          <tr>
-            <th>Entidad</th>
-            <th>TEA</th>
-            <th>TNA</th>
-            <th>Vigente Desde</th>
-            <th v-if="permissions.canManageBanks.value">Acciones</th>
-          </tr>
-          </thead>
-          <tbody>
-          <tr v-for="entity in financialEntities" :key="entity.id">
-            <td>{{ entity.name }}</td>
-            <td>{{ formatRate(entity.annualRateTea) }}</td>
-            <td>{{ formatRate(entity.annualRateTna) }}</td>
-            <td>{{ entity.effectiveFrom ? new Date(entity.effectiveFrom).toLocaleDateString('es-PE') : '-' }}</td>
-            <td v-if="permissions.canManageBanks.value">
-              <button class="icon-btn" @click="openEditEntity(entity)" title="Editar">✏️</button>
-              <button class="icon-btn delete" @click="deleteEntity(entity)" title="Eliminar">🗑️</button>
-            </td>
-          </tr>
-          </tbody>
-        </table>
-        <p v-else class="no-data-small">No hay entidades financieras registradas</p>
+        <div class="table-scroll-wrapper">
+          <table v-if="financialEntities.length > 0" class="financial-table">
+            <thead>
+            <tr>
+              <th>Entidad</th>
+              <th>TEA</th>
+              <th>TNA</th>
+              <th>Vigente Desde</th>
+              <th v-if="permissions.canManageBanks.value">Acciones</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr v-for="entity in financialEntities" :key="entity.id">
+              <td>{{ entity.name }}</td>
+              <td>{{ formatRate(entity.annualRateTea) }}</td>
+              <td>{{ formatRate(entity.annualRateTna) }}</td>
+              <td>{{ entity.effectiveFrom ? new Date(entity.effectiveFrom).toLocaleDateString('es-PE') : '-' }}</td>
+              <td v-if="permissions.canManageBanks.value">
+                <button class="icon-btn" @click="openEditEntity(entity)" title="Editar">✏️</button>
+                <button class="icon-btn delete" @click="deleteEntity(entity)" title="Eliminar">🗑️</button>
+              </td>
+            </tr>
+            </tbody>
+          </table>
+          <p v-else class="no-data-small">No hay entidades financieras registradas</p>
+        </div>
       </div>
     </div>
 
@@ -608,6 +610,16 @@ const formatRate = (rate) => {
 
 /* ===== RESPONSIVE STYLES ===== */
 
+/* Hacer la tabla scrollable horizontalmente */
+.financial-card {
+  overflow: hidden;
+}
+
+.table-scroll-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
 @media (max-width: 1024px) {
   .top-section {
     grid-template-columns: 1fr;
@@ -622,27 +634,27 @@ const formatRate = (rate) => {
 }
 
 @media (max-width: 768px) {
-  .settings-container {
+  .settings-page {
     padding: 20px 15px;
   }
 
-  .settings-container > h1 {
+  .page-title {
     font-size: 22px;
   }
 
-  .card {
+  .profile-card, .defaults-card, .financial-card {
     padding: 20px;
     border-radius: 12px;
   }
 
-  .card h2 {
+  .profile-card h2, .defaults-card h2, .financial-card h2 {
     font-size: 18px;
   }
 
-  .entities-header {
+  .card-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
   }
 
   .add-btn {
@@ -650,18 +662,18 @@ const formatRate = (rate) => {
     text-align: center;
   }
 
-  .entities-table {
-    display: block;
-    overflow-x: auto;
+  .financial-table {
+    min-width: 500px;
     font-size: 13px;
   }
 
-  .entities-table th, .entities-table td {
+  .financial-table th, .financial-table td {
     padding: 10px 8px;
+    white-space: nowrap;
   }
 
   /* Modal responsive */
-  .modal-content {
+  .modal {
     width: 95%;
     max-width: 95%;
     padding: 20px;
@@ -677,31 +689,60 @@ const formatRate = (rate) => {
   .save-btn, .cancel-btn {
     width: 100%;
   }
+
+  .profile-avatar {
+    width: 80px;
+    height: 80px;
+    font-size: 28px;
+  }
+
+  .profile-name h3 {
+    font-size: 18px;
+  }
 }
 
 @media (max-width: 480px) {
-  .settings-container {
+  .settings-page {
     padding: 15px 10px;
   }
 
-  .settings-container > h1 {
+  .page-title {
     font-size: 20px;
   }
 
-  .card {
+  .profile-card, .defaults-card, .financial-card {
     padding: 15px;
   }
 
-  .profile-fields .field label {
+  .field .label {
     font-size: 12px;
   }
 
-  .profile-fields .field span {
-    font-size: 14px;
+  .field .value {
+    font-size: 13px;
   }
 
-  .preferences-grid {
-    grid-template-columns: 1fr;
+  .financial-table {
+    min-width: 450px;
+  }
+
+  .financial-table th, .financial-table td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .profile-avatar {
+    width: 70px;
+    height: 70px;
+    font-size: 24px;
+  }
+
+  .modal {
+    padding: 15px;
+  }
+
+  .modal h3 {
+    font-size: 18px;
   }
 }
 </style>
