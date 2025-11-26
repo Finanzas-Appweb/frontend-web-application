@@ -46,7 +46,17 @@ export default {
       uploadingImages: false,
       uploadProgress: {},
       dragOver: false,
-      maxImages: 5
+      maxImages: 5,
+
+      // Modal de detalle de propiedad
+      showDetailModal: false,
+      selectedProperty: null,
+      loadingDetail: false,
+
+      // Modal de confirmación de eliminación
+      showDeleteModal: false,
+      propertyToDelete: null,
+      deleting: false
     };
   },
   async mounted() {
@@ -205,13 +215,30 @@ export default {
       }
     },
 
-    async deleteProperty(property) {
-      if (!confirm(`¿Estás seguro de eliminar la propiedad ${property.code}?`)) {
-        return;
-      }
+    // Mostrar modal de confirmación para eliminar
+    confirmDeleteProperty(property) {
+      this.propertyToDelete = property;
+      this.showDeleteModal = true;
+    },
+
+    // Cancelar eliminación
+    cancelDelete() {
+      this.showDeleteModal = false;
+      this.propertyToDelete = null;
+    },
+
+    // Confirmar y ejecutar eliminación
+    async executeDeleteProperty() {
+      if (!this.propertyToDelete) return;
+
       try {
-        await PropertiesAssembler.deleteProperty(property.id);
-        alert("Propiedad eliminada correctamente");
+        this.deleting = true;
+        await PropertiesAssembler.deleteProperty(this.propertyToDelete.id);
+        
+        // Cerrar modal
+        this.showDeleteModal = false;
+        this.propertyToDelete = null;
+        
         await this.loadProperties();
       } catch (error) {
         console.error("Error al eliminar propiedad:", error);
@@ -222,7 +249,14 @@ export default {
         } else {
           alert("Error al eliminar la propiedad");
         }
+      } finally {
+        this.deleting = false;
       }
+    },
+
+    // Mantener compatibilidad con llamadas antiguas
+    async deleteProperty(property) {
+      this.confirmDeleteProperty(property);
     },
 
     closeModal() {
@@ -314,6 +348,55 @@ export default {
 
     getThumbnail(url) {
       return getThumbnailUrl(url, 150, 100);
+    },
+
+    // ===== Modal de Detalle =====
+    async openPropertyDetail(property) {
+      try {
+        this.loadingDetail = true;
+        this.showDetailModal = true;
+        // Cargar datos completos de la propiedad
+        const fullProperty = await PropertiesAssembler.getProperty(property.id);
+        this.selectedProperty = fullProperty;
+      } catch (error) {
+        console.error("Error cargando detalle de propiedad:", error);
+        alert("Error al cargar los detalles de la propiedad");
+        this.showDetailModal = false;
+      } finally {
+        this.loadingDetail = false;
+      }
+    },
+
+    closeDetailModal() {
+      this.showDetailModal = false;
+      this.selectedProperty = null;
+    },
+
+    editFromDetail() {
+      if (this.selectedProperty) {
+        this.closeDetailModal();
+        this.openEditModal(this.selectedProperty);
+      }
+    },
+
+    async deleteFromDetail() {
+      if (this.selectedProperty) {
+        const property = this.selectedProperty;
+        this.closeDetailModal();
+        await this.deleteProperty(property);
+      }
+    },
+
+    getPropertyImages(property) {
+      const images = [];
+      if (property.images && property.images.length > 0) {
+        images.push(...property.images.map(img => img.url));
+      } else if (property.imagesUrl && property.imagesUrl.length > 0) {
+        images.push(...property.imagesUrl);
+      } else if (property.thumbnailUrl) {
+        images.push(property.thumbnailUrl);
+      }
+      return images;
     }
   },
 };
@@ -351,7 +434,7 @@ export default {
 
     <div v-else>
       <div class="cards-grid">
-        <div v-for="property in properties" :key="property.id" class="property-card">
+        <div v-for="property in properties" :key="property.id" class="property-card" @click="openPropertyDetail(property)">
           <div class="image-wrapper">
             <img 
               v-if="getPropertyImage(property)" 
@@ -370,7 +453,7 @@ export default {
                 <p class="code">{{ property.code }}</p>
                 <h3>{{ property.title }}</h3>
               </div>
-              <div class="card-actions">
+              <div class="card-actions" @click.stop>
                 <button v-if="permissions.canEditProperty.value" class="btn-icon edit-btn" @click="openEditModal(property)" title="Editar">✏️</button>
                 <button v-if="permissions.canDeleteProperty.value" class="btn-icon delete-btn" @click="deleteProperty(property)" title="Eliminar">🗑️</button>
               </div>
@@ -523,6 +606,110 @@ export default {
             <button type="button" @click="closeModal" class="cancel-btn">Cancelar</button>
           </div>
         </form>
+      </div>
+    </div>
+
+    <!-- Modal de Detalle de Propiedad -->
+    <div v-if="showDetailModal" class="modal-backdrop" @click.self="closeDetailModal">
+      <div class="modal-content detail-modal">
+        <div v-if="loadingDetail" class="loading-detail">
+          <span class="spinner-large"></span>
+          <p>Cargando detalles...</p>
+        </div>
+        <div v-else-if="selectedProperty">
+          <!-- Header -->
+          <div class="detail-header">
+            <div>
+              <span class="detail-code">{{ selectedProperty.code }}</span>
+              <h2>{{ selectedProperty.title }}</h2>
+            </div>
+            <button class="close-btn" @click="closeDetailModal">✕</button>
+          </div>
+
+          <!-- Galería de imágenes -->
+          <div class="detail-gallery" v-if="getPropertyImages(selectedProperty).length > 0">
+            <div class="gallery-main">
+              <img :src="getPropertyImages(selectedProperty)[0]" alt="Imagen principal" />
+            </div>
+            <div class="gallery-thumbs" v-if="getPropertyImages(selectedProperty).length > 1">
+              <img 
+                v-for="(img, idx) in getPropertyImages(selectedProperty)" 
+                :key="idx" 
+                :src="getThumbnail(img)" 
+                alt="Thumbnail"
+                class="thumb-img"
+              />
+            </div>
+          </div>
+          <div v-else class="detail-no-image">
+            <span>📷</span>
+            <span>Sin imágenes disponibles</span>
+          </div>
+
+          <!-- Info Grid -->
+          <div class="detail-info-grid">
+            <div class="info-item">
+              <span class="info-label">📍 Dirección</span>
+              <span class="info-value">{{ selectedProperty.address }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">🏘️ Ubicación</span>
+              <span class="info-value">{{ selectedProperty.district }}, {{ selectedProperty.province }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">🏠 Tipo</span>
+              <span class="info-value">{{ getPropertyType(selectedProperty.type) }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">📐 Área</span>
+              <span class="info-value">{{ selectedProperty.areaM2 }} m²</span>
+            </div>
+            <div class="info-item price-item">
+              <span class="info-label">💰 Precio</span>
+              <span class="info-value price-value">{{ getCurrencySymbol(selectedProperty.currency) }} {{ selectedProperty.price?.toLocaleString() }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">📊 Consultas</span>
+              <span class="info-value">{{ selectedProperty.consultsCount || 0 }}</span>
+            </div>
+          </div>
+
+          <!-- Descripción -->
+          <div v-if="selectedProperty.description" class="detail-description">
+            <h3>Descripción</h3>
+            <p>{{ selectedProperty.description }}</p>
+          </div>
+
+          <!-- Acciones -->
+          <div class="detail-actions">
+            <button v-if="permissions.canEditProperty.value" class="action-btn edit-action" @click="editFromDetail">
+              ✏️ Editar
+            </button>
+            <button v-if="permissions.canDeleteProperty.value" class="action-btn delete-action" @click="deleteFromDetail">
+              🗑️ Eliminar
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Confirmación para Eliminar Propiedad -->
+    <div v-if="showDeleteModal" class="modal-backdrop" @click.self="cancelDelete">
+      <div class="modal-content delete-confirm-modal">
+        <h2>⚠️ Confirmar Eliminación</h2>
+        <p>¿Estás seguro de que deseas eliminar esta propiedad?</p>
+        <div v-if="propertyToDelete" class="property-delete-info">
+          <p><strong>Código:</strong> {{ propertyToDelete.code }}</p>
+          <p><strong>Título:</strong> {{ propertyToDelete.title }}</p>
+          <p><strong>Precio:</strong> {{ getCurrencySymbol(propertyToDelete.currency) }} {{ propertyToDelete.price?.toLocaleString() }}</p>
+        </div>
+        <p class="warning-text">Esta acción no se puede deshacer.</p>
+        <div class="delete-modal-actions">
+          <button @click="executeDeleteProperty" class="confirm-delete-btn" :disabled="deleting">
+            {{ deleting ? 'Eliminando...' : 'Sí, Eliminar' }}
+          </button>
+          <button @click="cancelDelete" class="cancel-btn" :disabled="deleting">Cancelar</button>
+        </div>
       </div>
     </div>
   </div>
@@ -815,6 +1002,13 @@ export default {
   border: 1px solid #e5eff8;
   display: flex;
   flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.property-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 28px rgba(55, 127, 189, 0.25);
 }
 
 .image-wrapper {
@@ -1025,5 +1219,314 @@ export default {
 .remove-image-btn:hover {
   background: #dc2626;
   transform: scale(1.1);
+}
+
+/* ===== Modal de Detalle de Propiedad ===== */
+.detail-modal {
+  max-width: 700px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.loading-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 15px;
+  color: #377fbd;
+}
+
+.spinner-large {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #377fbd;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.detail-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+}
+
+.detail-header h2 {
+  margin: 5px 0 0;
+  color: #1f2937;
+  font-size: 22px;
+}
+
+.detail-code {
+  background: #377fbd;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: #f1f5f9;
+  border: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  background: #e2e8f0;
+}
+
+.detail-gallery {
+  margin-bottom: 20px;
+}
+
+.gallery-main {
+  width: 100%;
+  height: 280px;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.gallery-main img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery-thumbs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 5px;
+}
+
+.thumb-img {
+  width: 70px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.thumb-img:hover {
+  opacity: 1;
+}
+
+.detail-no-image {
+  background: linear-gradient(135deg, #e5f2fb 0%, #d1e8f8 100%);
+  height: 180px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.detail-no-image span:first-child {
+  font-size: 48px;
+}
+
+.detail-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.info-item {
+  background: #f8fafc;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.info-label {
+  display: block;
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.price-item {
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-color: #7dd3fc;
+}
+
+.price-value {
+  color: #0369a1;
+  font-size: 18px;
+}
+
+.detail-description {
+  margin-bottom: 20px;
+}
+
+.detail-description h3 {
+  color: #255a8a;
+  font-size: 16px;
+  margin: 0 0 10px;
+}
+
+.detail-description p {
+  color: #475569;
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.detail-actions {
+  display: flex;
+  gap: 12px;
+  padding-top: 15px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.action-btn {
+  flex: 1;
+  padding: 12px 20px;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.edit-action {
+  background: #377fbd;
+  color: white;
+}
+
+.edit-action:hover {
+  background: #2d6ba1;
+}
+
+.delete-action {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.delete-action:hover {
+  background: #fecaca;
+}
+
+/* Modal de confirmación de eliminación */
+.delete-confirm-modal {
+  max-width: 450px;
+}
+
+.delete-confirm-modal h2 {
+  color: #dc2626;
+  margin-bottom: 15px;
+  font-size: 22px;
+}
+
+.delete-confirm-modal > p {
+  color: #475569;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+.property-delete-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 15px;
+  margin-bottom: 15px;
+}
+
+.property-delete-info p {
+  margin: 5px 0;
+  color: #334155;
+  font-size: 14px;
+}
+
+.property-delete-info strong {
+  color: #1e293b;
+}
+
+.warning-text {
+  color: #dc2626;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.delete-modal-actions {
+  display: flex;
+  gap: 15px;
+}
+
+.confirm-delete-btn {
+  flex: 1;
+  background-color: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.confirm-delete-btn:hover:not(:disabled) {
+  background-color: #b91c1c;
+}
+
+.confirm-delete-btn:disabled {
+  background-color: #fca5a5;
+  cursor: not-allowed;
+}
+
+.cancel-btn {
+  flex: 1;
+  background-color: #e5e7eb;
+  color: #475569;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: #cbd5e1;
+}
+
+.cancel-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
 }
 </style>

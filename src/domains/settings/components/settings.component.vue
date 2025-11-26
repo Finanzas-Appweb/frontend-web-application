@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted } from "vue"
 import { SettingsAssembler } from "../services/settings.assembler.js"
 import { BanksAssembler } from "../../banks/services/banks.assembler.js"
-import { usePermissions } from "../../../shared/composables/usePermissions.js"
+import { usePermissions, refreshPermissions } from "../../../shared/composables/usePermissions.js"
 import NavBar from "../../../shared/presentation/components/nav-bar.vue"
 import FooterContent from "../../../shared/presentation/components/footer-content.vue"
 
@@ -35,6 +35,18 @@ onMounted(async () => {
   try {
     loading.value = true
     errorMessage.value = ""
+    
+    // Refrescar permisos al cargar la página
+    refreshPermissions()
+    
+    // Debug: mostrar el rol del usuario en consola
+    const userData = localStorage.getItem('user-data')
+    if (userData) {
+      const user = JSON.parse(userData)
+      console.log('Settings - Usuario actual:', user)
+      console.log('Settings - Rol del usuario:', user.role)
+      console.log('Settings - canManageBanks:', permissions.canManageBanks.value)
+    }
     
     // Cargar perfil y preferencias
     const profileData = await SettingsAssembler.getProfile()

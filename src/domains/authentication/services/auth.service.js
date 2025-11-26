@@ -1,4 +1,5 @@
 import apiClient from "../../../shared/infraestructure/services/api.client.js";
+import { refreshPermissions } from "../../../shared/composables/usePermissions.js";
 
 export const login = async (email, password) => {
     try {
@@ -12,6 +13,9 @@ export const login = async (email, password) => {
         // Guardar token y datos de usuario
         localStorage.setItem('user-token', token);
         localStorage.setItem('user-data', JSON.stringify(user));
+
+        // Refrescar permisos después del login
+        refreshPermissions();
 
         return user;
     } catch (error) {
@@ -31,6 +35,9 @@ export const register = async (userData) => {
         localStorage.setItem('user-token', token);
         localStorage.setItem('user-data', JSON.stringify(user));
 
+        // Refrescar permisos después del registro
+        refreshPermissions();
+
         return user;
     } catch (error) {
         const errorMessage = error.response?.data?.detail || error.response?.data?.title || 'Error al registrar usuario';
@@ -41,6 +48,8 @@ export const register = async (userData) => {
 export const logout = () => {
     localStorage.removeItem('user-token');
     localStorage.removeItem('user-data');
+    // Refrescar permisos después del logout
+    refreshPermissions();
 };
 
 export const getCurrentUser = () => {

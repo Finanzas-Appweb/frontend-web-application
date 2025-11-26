@@ -3,6 +3,7 @@ import { SimulationsAssembler } from "../services/simulations.assembler.js";
 import { ClientsAssembler } from "../../clients/services/clients.assembler.js";
 import { PropertiesAssembler } from "../../properties/services/properties.assembler.js";
 import { BanksAssembler } from "../../banks/services/banks.assembler.js";
+import { exportSimulationToExcel } from "../../../shared/services/excel.service.js";
 import NavBar from "../../../shared/presentation/components/nav-bar.vue";
 import FooterContent from "../../../shared/presentation/components/footer-content.vue";
 
@@ -50,7 +51,12 @@ export default {
       // Modal de confirmación para eliminar
       showDeleteModal: false,
       simulationToDelete: null,
-      deleting: false
+      deleting: false,
+
+      // Modal de detalle de simulación
+      showDetailModal: false,
+      selectedSimulation: null,
+      loadingDetail: false
     };
   },
   async mounted() {
@@ -307,6 +313,53 @@ export default {
       } finally {
         this.deleting = false;
       }
+    },
+
+    // ===== Modal de Detalle de Simulación =====
+    async openSimulationDetail(simulation) {
+      try {
+        this.loadingDetail = true;
+        this.showDetailModal = true;
+        // Cargar datos completos de la simulación (incluye amortizationSchedule)
+        const fullSimulation = await SimulationsAssembler.getSimulation(simulation.id);
+        this.selectedSimulation = fullSimulation;
+      } catch (error) {
+        console.error("Error cargando detalle de simulación:", error);
+        alert("Error al cargar los detalles de la simulación");
+        this.showDetailModal = false;
+      } finally {
+        this.loadingDetail = false;
+      }
+    },
+
+    closeDetailModal() {
+      this.showDetailModal = false;
+      this.selectedSimulation = null;
+    },
+
+    deleteFromDetail() {
+      if (this.selectedSimulation) {
+        const simulation = this.selectedSimulation;
+        this.closeDetailModal();
+        this.confirmDeleteSimulation(simulation);
+      }
+    },
+
+    downloadExcel() {
+      if (this.selectedSimulation) {
+        try {
+          exportSimulationToExcel(this.selectedSimulation);
+        } catch (error) {
+          console.error("Error generando Excel:", error);
+          alert("Error al generar el archivo Excel");
+        }
+      }
+    },
+
+    formatPercent(value) {
+      if (value === null || value === undefined) return '-';
+      const percent = value < 1 ? value * 100 : value;
+      return percent.toFixed(4) + '%';
     }
   },
 };
@@ -580,6 +633,9 @@ export default {
           <td>{{ getRateTypeName(sim.rateType) }}: {{ formatRate(sim.rateType === 1 ? sim.tea : sim.tna) }}</td>
           <td class="highlight">{{ getCurrencySymbol(sim.currency) }} {{ sim.monthlyPayment?.toFixed(2) }}</td>
           <td class="actions-cell">
+            <button class="btn-view" @click="openSimulationDetail(sim)" title="Ver detalles">
+              👁️
+            </button>
             <button class="btn-delete" @click="confirmDeleteSimulation(sim)" title="Eliminar simulación">
               🗑️
             </button>
@@ -607,6 +663,159 @@ export default {
             {{ deleting ? 'Eliminando...' : 'Sí, Eliminar' }}
           </button>
           <button @click="cancelDelete" class="cancel-btn" :disabled="deleting">Cancelar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal de Detalle de Simulación -->
+    <div v-if="showDetailModal" class="modal-backdrop" @click.self="closeDetailModal">
+      <div class="modal-content detail-modal">
+        <button class="close-btn" @click="closeDetailModal">&times;</button>
+        
+        <div v-if="loadingDetail" class="loading-detail">
+          <p>Cargando detalles...</p>
+        </div>
+        
+        <div v-else-if="selectedSimulation" class="simulation-detail">
+          <h2>📊 Detalle de Simulación</h2>
+          
+          <!-- Información General -->
+          <div class="detail-section">
+            <h3>Información General</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="label">Cliente</span>
+                <span class="value">{{ selectedSimulation.clientName }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Propiedad</span>
+                <span class="value">{{ selectedSimulation.propertyTitle }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Banco</span>
+                <span class="value">{{ getBankName(selectedSimulation) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Fecha de Creación</span>
+                <span class="value">{{ new Date(selectedSimulation.createdAtUtc).toLocaleDateString('es-PE') }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Parámetros del Préstamo -->
+          <div class="detail-section">
+            <h3>Parámetros del Préstamo</h3>
+            <div class="detail-grid">
+              <div class="detail-item">
+                <span class="label">Monto Principal</span>
+                <span class="value highlight">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.principal?.toLocaleString() }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Plazo</span>
+                <span class="value">{{ selectedSimulation.termMonths }} meses ({{ (selectedSimulation.termMonths / 12).toFixed(1) }} años)</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Tipo de Tasa</span>
+                <span class="value">{{ getRateTypeName(selectedSimulation.rateType) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">TEA</span>
+                <span class="value">{{ formatPercent(selectedSimulation.tea) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">TNA</span>
+                <span class="value">{{ formatPercent(selectedSimulation.tna) }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Fecha de Inicio</span>
+                <span class="value">{{ selectedSimulation.startDate ? new Date(selectedSimulation.startDate).toLocaleDateString('es-PE') : 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="label">Tipo de Gracia</span>
+                <span class="value">{{ selectedSimulation.graceType === 0 ? 'Sin gracia' : selectedSimulation.graceType === 1 ? 'Total' : 'Parcial' }}</span>
+              </div>
+              <div class="detail-item" v-if="selectedSimulation.graceMonths > 0">
+                <span class="label">Meses de Gracia</span>
+                <span class="value">{{ selectedSimulation.graceMonths }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Resultados -->
+          <div class="detail-section">
+            <h3>Resultados de la Simulación</h3>
+            <div class="results-grid">
+              <div class="result-card primary">
+                <span class="result-label">Cuota Mensual</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.monthlyPayment?.toFixed(2) }}</span>
+              </div>
+              <div class="result-card">
+                <span class="result-label">TEM</span>
+                <span class="result-value">{{ formatPercent(selectedSimulation.tem) }}</span>
+              </div>
+              <div class="result-card">
+                <span class="result-label">TCEA</span>
+                <span class="result-value">{{ formatPercent(selectedSimulation.tcea) }}</span>
+              </div>
+              <div class="result-card">
+                <span class="result-label">TIR</span>
+                <span class="result-value">{{ formatPercent(selectedSimulation.tir) }}</span>
+              </div>
+              <div class="result-card">
+                <span class="result-label">VAN</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.van?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+              </div>
+              <div class="result-card">
+                <span class="result-label">Intereses Totales</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.totalInterest?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+              </div>
+              <div class="result-card highlight">
+                <span class="result-label">Costo Total</span>
+                <span class="result-value">{{ getCurrencySymbol(selectedSimulation.currency) }} {{ selectedSimulation.totalCost?.toLocaleString('es-PE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tabla de Amortización -->
+          <div class="detail-section" v-if="selectedSimulation.amortizationSchedule && selectedSimulation.amortizationSchedule.length > 0">
+            <h3>Cronograma de Amortización</h3>
+            <div class="amortization-table-container">
+              <table class="amortization-table">
+                <thead>
+                  <tr>
+                    <th>Período</th>
+                    <th>Fecha</th>
+                    <th>Saldo Inicial</th>
+                    <th>Interés</th>
+                    <th>Amortización</th>
+                    <th>Cuota</th>
+                    <th>Saldo Final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in selectedSimulation.amortizationSchedule" :key="row.period">
+                    <td>{{ row.period }}</td>
+                    <td>{{ row.dueDate ? new Date(row.dueDate).toLocaleDateString('es-PE') : '-' }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.openingBalance?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.interest?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.principal?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.installment?.toFixed(2) }}</td>
+                    <td>{{ getCurrencySymbol(selectedSimulation.currency) }} {{ row.closingBalance?.toFixed(2) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Acciones -->
+          <div class="detail-actions">
+            <button class="btn-excel" @click="downloadExcel">
+              📥 Descargar Excel
+            </button>
+            <button class="btn-delete-detail" @click="deleteFromDetail">
+              🗑️ Eliminar Simulación
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -1039,5 +1248,239 @@ export default {
 .cancel-btn:disabled {
   cursor: not-allowed;
   opacity: 0.7;
+}
+
+/* Botón de ver detalles */
+.btn-view {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 5px 10px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  margin-right: 5px;
+}
+
+.btn-view:hover {
+  background: #e0f2fe;
+  transform: scale(1.1);
+}
+
+/* Modal de Detalle */
+.detail-modal {
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+}
+
+.detail-modal .close-btn {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  background: none;
+  border: none;
+  font-size: 28px;
+  cursor: pointer;
+  color: #64748b;
+  transition: color 0.2s;
+}
+
+.detail-modal .close-btn:hover {
+  color: #dc2626;
+}
+
+.loading-detail {
+  text-align: center;
+  padding: 50px;
+  color: #377fbd;
+}
+
+.simulation-detail h2 {
+  color: #255a8a;
+  margin-bottom: 25px;
+  font-size: 24px;
+  padding-right: 40px;
+}
+
+.detail-section {
+  margin-bottom: 25px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.detail-section:last-of-type {
+  border-bottom: none;
+}
+
+.detail-section h3 {
+  color: #0369a1;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 15px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+}
+
+.detail-grid .detail-item {
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.detail-grid .detail-item .label {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.detail-grid .detail-item .value {
+  font-size: 14px;
+  color: #1e293b;
+  font-weight: 600;
+}
+
+.detail-grid .detail-item .value.highlight {
+  color: #0284c7;
+  font-size: 16px;
+}
+
+/* Results grid in detail modal */
+.results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 15px;
+}
+
+.result-card {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  padding: 15px;
+  text-align: center;
+}
+
+.result-card.primary {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+  border: none;
+}
+
+.result-card.primary .result-label,
+.result-card.primary .result-value {
+  color: white;
+}
+
+.result-card.highlight {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  border: none;
+}
+
+.result-card.highlight .result-label,
+.result-card.highlight .result-value {
+  color: white;
+}
+
+.result-card .result-label {
+  display: block;
+  font-size: 12px;
+  color: #0369a1;
+  margin-bottom: 5px;
+}
+
+.result-card .result-value {
+  display: block;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0284c7;
+}
+
+/* Amortization table in detail modal */
+.amortization-table-container {
+  max-height: 300px;
+  overflow: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.amortization-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.amortization-table th {
+  background: #377fbd;
+  color: white;
+  padding: 10px 8px;
+  text-align: left;
+  position: sticky;
+  top: 0;
+  font-weight: 600;
+}
+
+.amortization-table td {
+  padding: 8px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.amortization-table tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.amortization-table tr:hover {
+  background: #e0f2fe;
+}
+
+/* Detail actions */
+.detail-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-excel {
+  flex: 1;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-excel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);
+}
+
+.btn-delete-detail {
+  flex: 1;
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete-detail:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(220, 38, 38, 0.3);
 }
 </style>
